@@ -1,0 +1,7 @@
+airlines:
+    conn_type: postgres
+    host: postgres
+    login: airflow
+    password: airflow
+    schema: airlines
+    port: 5432
