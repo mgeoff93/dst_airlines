@@ -62,44 +62,76 @@ def flight_data_pipeline():
 		postgrescli = PostgresClient()
 		weathercli = WeatherClient()
 		flightawarecli = FlightAwareClient(seleniumcli, postgrescli)
-
+	
 		try:
 			callsign = flight.get("callsign")
 			icao24 = flight.get("icao24")
 			request_id = flight.get("request_id")
-
+	
 			# --- Parsing statique ---
 			static_row = flightawarecli.parse_static_flight(callsign)
 			if not static_row:
 				return None
+	
+			origin_code = static_row.get("origin_code")
+			destination_code = static_row.get("destination_code")
+			airline_name = static_row.get("airline_name")
+	
+			# --- CAS : statique incomplet → flight_static ONLY ---
+			if not origin_code or not destination_code or not airline_name:
+				static_row["commercial_flight"] = None
+				logging.info(
+					f"{callsign}: static incomplete "
+					f"(origin={origin_code}, dest={destination_code}, airline={airline_name})"
+				)
+				return {
+					"static_rows": [static_row],
+					"dynamic_rows": [],
+					"live_rows": []
+				}
+	
+			# --- CAS : vol explicitement non commercial ---
 			if static_row.get("commercial_flight") is False:
-				return {"static_rows": [static_row], "dynamic_rows": [], "live_rows": []}
-
+				return {
+					"static_rows": [static_row],
+					"dynamic_rows": [],
+					"live_rows": []
+				}
+	
 			# --- Ajout météo ---
 			lat, lon = flight.get("latitude"), flight.get("longitude")
 			flight.update(weathercli.get_weather(lat, lon))
-
+	
 			# --- Parsing dynamique ---
 			dynamic_row = flightawarecli.parse_dynamic_flight(callsign, icao24)
 			if not dynamic_row or not dynamic_row.get("departure_scheduled"):
-				logging.warning(f"Skipping flight {callsign}: missing departure_scheduled or dynamic data")
-				return None
-
+				logging.warning(
+					f"Skipping flight {callsign}: missing departure_scheduled or dynamic data"
+				)
+				return {
+					"static_rows": [static_row],
+					"dynamic_rows": [],
+					"live_rows": []
+				}
+	
 			live_row = flight.copy()
 			live_row["request_id"] = request_id
 			live_row["departure_scheduled"] = dynamic_row["departure_scheduled"]
 			live_row["flight_date"] = dynamic_row["flight_date"]
-
+	
 			return {
 				"static_rows": [static_row],
 				"dynamic_rows": [dynamic_row],
 				"live_rows": [live_row]
 			}
-
+	
 		except Exception as e:
-			logging.error(f"Scrape failed for {flight.get('callsign', 'UNKNOWN')}: {e}", exc_info=True)
+			logging.error(
+				f"Scrape failed for {flight.get('callsign', 'UNKNOWN')}: {e}",
+				exc_info=True
+			)
 			raise
-
+		
 		finally:
 			seleniumcli.close()
 			postgrescli.close()
