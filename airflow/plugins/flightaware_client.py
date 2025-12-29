@@ -127,18 +127,18 @@ class FlightAwareClient:
 	def parse_dynamic_flight(self, callsign, icao24):
 		if not self._prepare_page(callsign, selector="div.flightPageDetails", load_page=False):
 			return None
-
+	
 		current_date = datetime.utcnow().date().isoformat()
-
+	
 		# Récupère le dernier vol dynamique enregistré
 		dynamic = self.postgres.get_latest_dynamic_flight(callsign, icao24)
 		logging.info(f"{callsign} ({icao24}): last dynamic flight: {dynamic}")
-
+	
 		# Récupération et normalisation du status FlightAware
 		raw_status = self.selenium.request("div.flightPageSummaryStatus")
 		current_status = re.sub("\n", " ", raw_status).lower() if raw_status else ""
 		logging.info(f"{callsign}: current FlightAware status: '{current_status}'")
-
+	
 		if current_status.startswith(("expected", "scheduled", "taxiing")):
 			status = "departing"
 		elif current_status.startswith(("en route", "arriving", "ready")):
@@ -148,99 +148,82 @@ class FlightAwareClient:
 		else:
 			logging.warning(f"{callsign}: statut inconnu détecté: '{current_status}'")
 			status = "unknown"
-
+	
 		# Fonctions utilitaires pour récupérer les horaires
 		def get_scheduled_departure():
 			val = self.selenium.request(
 				"div:nth-child(2) > div.flightPageDataTimesParent > div:nth-child(1) > div.flightPageDataAncillaryText > div > span"
 			)
-			if val is None:
-				logging.warning(f"{callsign}: scheduled departure not found")
 			return self._get_24h_time_from_string(val) if val else None
-
+	
 		def get_scheduled_arrival():
 			val = self.selenium.request(
 				"div:nth-child(4) > div.flightPageDataTimesParent > div:nth-child(2) > div.flightPageDataAncillaryText > div > span"
 			)
-			if val is None:
-				logging.warning(f"{callsign}: scheduled arrival not found")
 			return self._get_24h_time_from_string(val) if val else None
-
+	
 		def get_actual_departure():
 			val = self.selenium.request(
 				"div:nth-child(2) > div.flightPageDataTimesParent > div:nth-child(1) > div.flightPageDataActualTimeText"
 			)
 			return self._get_24h_time_from_string(val) if val else None
-
+	
 		def get_actual_arrival():
 			val = self.selenium.request(
 				"div:nth-child(4) > div.flightPageDataTimesParent > div:nth-child(2) > div.flightPageDataActualTimeText"
 			)
 			return self._get_24h_time_from_string(val) if val else None
-
+	
 		dynamic_row = None
-
-		# --- CAS 1 : INSERTION / RÉINITIALISATION ---
+		new_key = (callsign, icao24, current_date, get_scheduled_departure())
+	
+		# --- CAS 1 : pas de vol précédent ou vol déjà arrivé ---
 		if dynamic is None or dynamic.get("status") == "arrived":
-			scheduled_departure = get_scheduled_departure()
-			scheduled_arrival = get_scheduled_arrival()
-			actual_departure = actual_arrival = None
-
-			if status in ("en route", "arrived"):
-				actual_departure = get_actual_departure()
-				if status == "arrived":
-					actual_arrival = get_actual_arrival()
-
 			dynamic_row = {
 				"callsign": callsign,
 				"icao24": icao24,
 				"flight_date": current_date,
-				"departure_scheduled": scheduled_departure,
-				"departure_actual": actual_departure,
-				"arrival_scheduled": scheduled_arrival,
-				"arrival_actual": actual_arrival,
-				"status": status
+				"departure_scheduled": get_scheduled_departure(),
+				"departure_actual": get_actual_departure() if status in ("en route", "arrived") else None,
+				"arrival_scheduled": get_scheduled_arrival(),
+				"arrival_actual": get_actual_arrival() if status == "arrived" else None,
+				"status": status,
+				"unique_key": new_key
 			}
-
-		# --- CAS 2 : CHANGEMENT DE STATUT ---
-		elif status != dynamic.get("status"):
-			actual_departure = dynamic.get("departure_actual")
-			actual_arrival = dynamic.get("arrival_actual")
-
-			if status == "en route":
-				actual_departure = get_actual_departure()
-			elif status == "arrived":
-				actual_arrival = get_actual_arrival()
-				if dynamic.get("status") == "departing":
-					actual_departure = get_actual_departure()
-
-			dynamic_row = {
-				"callsign": callsign,
-				"icao24": icao24,
-				"flight_date": current_date,
-				"departure_scheduled": dynamic.get("departure_scheduled"),
-				"departure_actual": actual_departure,
-				"arrival_scheduled": dynamic.get("arrival_scheduled"),
-				"arrival_actual": actual_arrival,
-				"status": status
-			}
-
-		# --- CAS 3 : MISE À JOUR LÉGÈRE ---
-		elif dynamic.get("status") == status and status not in ("arrived", "unknown"):
-			dynamic_row = {
-				"callsign": callsign,
-				"icao24": icao24,
-				"flight_date": current_date,
-				"departure_scheduled": dynamic.get("departure_scheduled"),
-				"departure_actual": dynamic.get("departure_actual"),
-				"arrival_scheduled": dynamic.get("arrival_scheduled"),
-				"arrival_actual": dynamic.get("arrival_actual"),
-				"status": status
-			}
-
-		# Vérifie que les champs essentiels sont présents
+	
+		# --- CAS 2 : vol réapparaît ou changement de statut ---
+		else:
+			last_key = dynamic.get("unique_key")
+			if new_key == last_key:
+				# Même vol → mettre à jour le status et horaires
+				dynamic_row = {
+					"callsign": callsign,
+					"icao24": icao24,
+					"flight_date": dynamic["flight_date"],
+					"departure_scheduled": dynamic["departure_scheduled"],
+					"departure_actual": dynamic.get("departure_actual") or get_actual_departure(),
+					"arrival_scheduled": dynamic.get("arrival_scheduled"),
+					"arrival_actual": dynamic.get("arrival_actual"),
+					"status": status,
+					"unique_key": new_key
+				}
+			elif status != dynamic.get("status") or status not in ("arrived", "unknown"):
+				# Nouveau vol → nouvelle ligne
+				dynamic_row = {
+					"callsign": callsign,
+					"icao24": icao24,
+					"flight_date": current_date,
+					"departure_scheduled": get_scheduled_departure(),
+					"departure_actual": get_actual_departure() if status in ("en route", "arrived") else None,
+					"arrival_scheduled": get_scheduled_arrival(),
+					"arrival_actual": get_actual_arrival() if status == "arrived" else None,
+					"status": status,
+					"unique_key": new_key
+				}
+	
+		# Vérifie les champs essentiels
 		if dynamic_row and (dynamic_row.get("flight_date") is None or dynamic_row.get("departure_scheduled") is None):
 			logging.warning(f"{callsign}: dynamic row skipped due to missing flight_date or departure_scheduled")
 			return None
-
+	
 		return dynamic_row

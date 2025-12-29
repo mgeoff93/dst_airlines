@@ -22,24 +22,26 @@ class PostgresClient:
 		result = self.hook.get_first(sql=query, parameters=(callsign, icao24))
 		if result is None:
 			return None
-
+	
 		columns = [
 			"icao24", "callsign", "flight_date", "departure_scheduled", "departure_actual",
 			"arrival_scheduled", "arrival_actual", "status", "last_update"
 		]
 		dynamic = dict(zip(columns, result))
-
-		if dynamic["status"] == "en route":
+	
+		# Ajouter la combinaison unique
+		dynamic["unique_key"] = (
+			dynamic["callsign"], dynamic["icao24"], dynamic["flight_date"], dynamic["departure_scheduled"]
+		)
+	
+		# Garde-fou pour vols en route ou departing
+		if dynamic["status"] in ("en route", "departing"):
 			last_update = dynamic["last_update"]
-
-			# Convertir en datetime si c'est une string
 			if isinstance(last_update, str):
 				last_update = datetime.fromisoformat(last_update)
-
-			# Ajouter tzinfo UTC si absent
 			if last_update.tzinfo is None:
 				last_update = last_update.replace(tzinfo=timezone.utc)
-
+	
 			now = datetime.now(timezone.utc)
 			if now - last_update > timedelta(minutes=20):
 				update_sql = """
@@ -52,7 +54,7 @@ class PostgresClient:
 					callsign, icao24, dynamic["flight_date"], dynamic["departure_scheduled"]
 				))
 				dynamic["status"] = "arrived"
-
+	
 		return dynamic
 
 	def insert_flight_static(self, rows):

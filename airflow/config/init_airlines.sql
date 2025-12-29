@@ -28,8 +28,9 @@ CREATE TABLE flight_dynamic (
 	arrival_actual VARCHAR(5),
 	status VARCHAR(10) NOT NULL,
 	last_update TIMESTAMP DEFAULT NOW(),
+	unique_key VARCHAR(64) NOT NULL,
 
-	CONSTRAINT pk_flight_dynamic PRIMARY KEY (callsign, icao24, flight_date, departure_scheduled)
+	CONSTRAINT pk_flight_dynamic PRIMARY KEY (unique_key)
 );
 
 CREATE INDEX idx_dynamic_callsign ON flight_dynamic(callsign);
