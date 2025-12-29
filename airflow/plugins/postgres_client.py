@@ -41,7 +41,7 @@ class PostgresClient:
 				last_update = last_update.replace(tzinfo=timezone.utc)
 
 			now = datetime.now(timezone.utc)
-			if now - last_update > timedelta(hours=1):
+			if now - last_update > timedelta(minutes=20):
 				update_sql = """
 					UPDATE flight_dynamic
 					SET status = 'arrived'
