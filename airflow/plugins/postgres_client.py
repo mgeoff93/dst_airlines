@@ -1,6 +1,7 @@
 import logging
 from airflow.models import Variable
 from airflow.providers.postgres.hooks.postgres import PostgresHook
+from datetime import datetime, timedelta, timezone
 
 class PostgresClient:
 	def __init__(self):
@@ -21,11 +22,38 @@ class PostgresClient:
 		result = self.hook.get_first(sql=query, parameters=(callsign, icao24))
 		if result is None:
 			return None
+
 		columns = [
 			"icao24", "callsign", "flight_date", "departure_scheduled", "departure_actual",
 			"arrival_scheduled", "arrival_actual", "status", "last_update"
 		]
-		return dict(zip(columns, result))
+		dynamic = dict(zip(columns, result))
+
+		if dynamic["status"] == "en route":
+			last_update = dynamic["last_update"]
+
+			# Convertir en datetime si c'est une string
+			if isinstance(last_update, str):
+				last_update = datetime.fromisoformat(last_update)
+
+			# Ajouter tzinfo UTC si absent
+			if last_update.tzinfo is None:
+				last_update = last_update.replace(tzinfo=timezone.utc)
+
+			now = datetime.now(timezone.utc)
+			if now - last_update > timedelta(hours=1):
+				update_sql = """
+					UPDATE flight_dynamic
+					SET status = 'arrived'
+					WHERE callsign = %s AND icao24 = %s 
+					  AND flight_date = %s AND departure_scheduled = %s
+				"""
+				self.hook.run(update_sql, parameters=(
+					callsign, icao24, dynamic["flight_date"], dynamic["departure_scheduled"]
+				))
+				dynamic["status"] = "arrived"
+
+		return dynamic
 
 	def insert_flight_static(self, rows):
 		if not rows:

@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Query
 from postgres_client import PostgresClient
-from uuid import UUID
+from datetime import date
 
 app = FastAPI(
     title="DST Airlines API",
@@ -9,6 +9,10 @@ app = FastAPI(
 )
 
 db = PostgresClient()
+
+# -------------------------------------------------------------------
+# Root & Health
+# -------------------------------------------------------------------
 
 @app.get("/", tags=["Root"])
 def root():
@@ -21,148 +25,178 @@ def root():
 @app.get("/health", tags=["Root"])
 def health_check():
     try:
-        result = db.query("SELECT 1 as health;")
+        db.query("SELECT 1;")
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Database error: {str(e)}")
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+# -------------------------------------------------------------------
+# STATIC
+# -------------------------------------------------------------------
 
 @app.get("/static", tags=["Flight Static"])
 def get_all_static(limit: int = Query(100, ge=1, le=1000)):
     sql = "SELECT * FROM flight_static LIMIT %s;"
-    result = db.query(sql, (limit,))
-    return {"count": len(result), "flights": result}
+    rows = db.query(sql, (limit,))
+    return {"count": len(rows), "flights": rows}
 
 @app.get("/static/{callsign}", tags=["Flight Static"])
 def get_static_by_callsign(callsign: str):
     sql = "SELECT * FROM flight_static WHERE callsign = %s;"
-    result = db.query(sql, (callsign,))
-    if not result:
-        raise HTTPException(status_code=404, detail=f"Flight '{callsign}' not found")
-    return result[0]
+    rows = db.query(sql, (callsign,))
+    if not rows:
+        raise HTTPException(status_code=404, detail="Flight not found")
+    return rows[0]
 
 @app.get("/static/by-airline", tags=["Flight Static"])
 def get_static_by_airline(airline_name: str):
     sql = "SELECT * FROM flight_static WHERE airline_name = %s;"
-    result = db.query(sql, (airline_name,))
-    return {"count": len(result), "flights": result}
+    rows = db.query(sql, (airline_name,))
+    return {"count": len(rows), "flights": rows}
 
 @app.get("/static/from/{origin_code}", tags=["Flight Static"])
 def get_static_from_origin(origin_code: str):
     sql = "SELECT * FROM flight_static WHERE origin_code = %s;"
-    result = db.query(sql, (origin_code,))
-    return {"count": len(result), "flights": result}
+    rows = db.query(sql, (origin_code,))
+    return {"count": len(rows), "flights": rows}
 
 @app.get("/static/to/{destination_code}", tags=["Flight Static"])
 def get_static_to_destination(destination_code: str):
     sql = "SELECT * FROM flight_static WHERE destination_code = %s;"
-    result = db.query(sql, (destination_code,))
-    return {"count": len(result), "flights": result}
+    rows = db.query(sql, (destination_code,))
+    return {"count": len(rows), "flights": rows}
+
+
+# -------------------------------------------------------------------
+# DYNAMIC
+# -------------------------------------------------------------------
 
 @app.get("/dynamic", tags=["Flight Dynamic"])
 def get_all_dynamic(limit: int = Query(100, ge=1, le=1000)):
-    sql = "SELECT * FROM flight_dynamic ORDER BY last_update DESC LIMIT %s;"
-    result = db.query(sql, (limit,))
-    return {"count": len(result), "flights": result}
-
-@app.get("/dynamic/{flight_id}", tags=["Flight Dynamic"])
-def get_dynamic_by_id(flight_id: UUID):
-    sql = "SELECT * FROM flight_dynamic WHERE flight_id = %s;"
-    result = db.query(sql, (str(flight_id),))
-    if not result:
-        raise HTTPException(status_code=404, detail="Dynamic flight not found")
-    return result[0]
-
-@app.get("/dynamic/by-callsign/{callsign}", tags=["Flight Dynamic"])
-def get_dynamic_by_callsign(callsign: str):
-    sql = "SELECT * FROM flight_dynamic WHERE callsign = %s ORDER BY last_update DESC;"
-    result = db.query(sql, (callsign,))
-    return {"count": len(result), "flights": result}
+    sql = """
+        SELECT *
+        FROM flight_dynamic
+        ORDER BY last_update DESC
+        LIMIT %s;
+    """
+    rows = db.query(sql, (limit,))
+    return {"count": len(rows), "flights": rows}
 
 @app.get("/dynamic/last/{callsign}", tags=["Flight Dynamic"])
-def get_dynamic_last(callsign: str):
+def get_last_dynamic_by_callsign(callsign: str):
     sql = """
-        SELECT * FROM flight_dynamic 
-        WHERE callsign = %s 
-        ORDER BY last_update DESC 
+        SELECT *
+        FROM flight_dynamic
+        WHERE callsign = %s
+        ORDER BY flight_date DESC, departure_scheduled DESC
         LIMIT 1;
     """
-    result = db.query(sql, (callsign,))
-    if not result:
+    rows = db.query(sql, (callsign,))
+    if not rows:
         raise HTTPException(status_code=404, detail="Flight not found")
-    return result[0]
+    return rows[0]
+
+@app.get("/dynamic/by-callsign/{callsign}", tags=["Flight Dynamic"])
+def get_dynamic_history(callsign: str):
+    sql = """
+        SELECT *
+        FROM flight_dynamic
+        WHERE callsign = %s
+        ORDER BY flight_date, departure_scheduled;
+    """
+    rows = db.query(sql, (callsign,))
+    return {"count": len(rows), "flights": rows}
+
+
+# -------------------------------------------------------------------
+# LIVE
+# -------------------------------------------------------------------
 
 @app.get("/live/last/{icao24}", tags=["Live Data"])
 def get_live_last(icao24: str):
     sql = """
-        SELECT * FROM live_data 
-        WHERE icao24 = %s 
-        ORDER BY request_id DESC 
+        SELECT *
+        FROM live_data
+        WHERE icao24 = %s
+        ORDER BY request_id DESC
         LIMIT 1;
     """
-    result = db.query(sql, (icao24,))
-    if not result:
+    rows = db.query(sql, (icao24,))
+    if not rows:
         raise HTTPException(status_code=404, detail="Live data not found")
-    return result[0]
+    return rows[0]
 
-@app.get("/live/history/{flight_id}", tags=["Live Data"])
-def get_live_history(flight_id: UUID):
-    sql = "SELECT * FROM live_data WHERE flight_id = %s ORDER BY request_id;"
-    result = db.query(sql, (str(flight_id),))
-    return {"count": len(result), "data": result}
+@app.get("/live/history", tags=["Live Data"])
+def get_live_history(
+    callsign: str,
+    icao24: str,
+    flight_date: date,
+    departure_scheduled: str
+):
+    sql = """
+        SELECT *
+        FROM live_data
+        WHERE callsign = %s
+          AND icao24 = %s
+          AND flight_date = %s
+          AND departure_scheduled = %s
+        ORDER BY request_id;
+    """
+    rows = db.query(sql, (callsign, icao24, flight_date, departure_scheduled))
+    return {"count": len(rows), "data": rows}
+
+
+# -------------------------------------------------------------------
+# MERGED
+# -------------------------------------------------------------------
 
 @app.get("/flights/full/{callsign}", tags=["Merged"])
 def get_full_flight(callsign: str):
-    sql_static = "SELECT * FROM flight_static WHERE callsign = %s;"
-    static = db.query(sql_static, (callsign,))
+    static = db.query(
+        "SELECT * FROM flight_static WHERE callsign = %s;",
+        (callsign,)
+    )
     if not static:
-        raise HTTPException(status_code=404, detail=f"Flight '{callsign}' not found")
-    static = static[0]
-    
-    sql_dynamic = """
-        SELECT * FROM flight_dynamic
+        raise HTTPException(status_code=404, detail="Flight not found")
+
+    dynamic = db.query(
+        """
+        SELECT *
+        FROM flight_dynamic
         WHERE callsign = %s
-        ORDER BY last_update DESC 
+        ORDER BY flight_date DESC, departure_scheduled DESC
         LIMIT 1;
-    """
-    dynamic = db.query(sql_dynamic, (callsign,))
-    dynamic = dynamic[0] if dynamic else None
-    
+        """,
+        (callsign,)
+    )
+
     live = None
     if dynamic:
-        icao24 = dynamic.get("icao24")
-        if icao24:
-            sql_live = """
-                SELECT * FROM live_data
-                WHERE icao24 = %s
-                ORDER BY request_id DESC 
-                LIMIT 1;
+        d = dynamic[0]
+        live_rows = db.query(
             """
-            live_data = db.query(sql_live, (icao24,))
-            live = live_data[0] if live_data else None
-    
+            SELECT *
+            FROM live_data
+            WHERE callsign = %s
+              AND icao24 = %s
+              AND flight_date = %s
+              AND departure_scheduled = %s
+            ORDER BY request_id DESC
+            LIMIT 1;
+            """,
+            (
+                d["callsign"],
+                d["icao24"],
+                d["flight_date"],
+                d["departure_scheduled"]
+            )
+        )
+        live = live_rows[0] if live_rows else None
+
     return {
         "callsign": callsign,
-        "static": static,
-        "dynamic": dynamic,
+        "static": static[0],
+        "dynamic": dynamic[0] if dynamic else None,
         "live": live
     }
-
-@app.get("/flights/history/{callsign}", tags=["Merged"])
-def get_full_history(callsign: str):
-    sql_dynamic = "SELECT * FROM flight_dynamic WHERE callsign = %s ORDER BY last_update;"
-    dynamics = db.query(sql_dynamic, (callsign,))
-    
-    if not dynamics:
-        raise HTTPException(status_code=404, detail=f"No history for '{callsign}'")
-    
-    history = []
-    for d in dynamics:
-        flight_id = d["flight_id"]
-        sql_live = "SELECT * FROM live_data WHERE flight_id = %s ORDER BY request_id;"
-        live_records = db.query(sql_live, (str(flight_id),))
-        history.append({
-            "dynamic": d,
-            "live": live_records
-        })
-    
-    return {"callsign": callsign, "count": len(history), "history": history}
