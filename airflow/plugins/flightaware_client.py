@@ -52,7 +52,7 @@ class FlightAwareClient:
 		logging.info(f"{callsign}: Début du parsing statique.")
 		if not self._prepare_page(callsign, selector="div.flightPageDetails", load_page=True):
 			return None
-
+	
 		try:
 			airline_name = self.selenium.request(
 				"div.flightPageDetails > div:nth-child(9) > div:nth-child(2) > div > div > div:nth-child(2) a"
@@ -62,7 +62,7 @@ class FlightAwareClient:
 		except Exception as e:
 			logging.debug(f"{callsign}: Erreur récupération codes/airline. {e}")
 			airline_name = origin_code = destination_code = None
-
+	
 		scraping_ok = any([airline_name, origin_code, destination_code])
 		if not scraping_ok:
 			commercial = None
@@ -70,26 +70,26 @@ class FlightAwareClient:
 			commercial = True
 		else:
 			commercial = False
-
+	
 		origin_airport = destination_airport = origin_city = destination_city = None
-
+	
 		if commercial is True:
 			origin_airport_raw = self.selenium.request("div.flightPageSummaryOrigin a")
 			if origin_airport_raw:
 				cleaned = re.sub(rf"\s*-\s*{origin_code}\b", "", origin_airport_raw)
 				cleaned = re.sub(r"int\s*[’'‘`´]?\s*l\s*(airport)?", "International Airport", cleaned, flags=re.IGNORECASE)
 				origin_airport = cleaned.strip()
-
+	
 			destination_airport_raw = self.selenium.request("div.flightPageSummaryDestination a")
 			if destination_airport_raw:
 				cleaned = re.sub(rf"\s*-\s*{destination_code}\b", "", destination_airport_raw)
 				cleaned = re.sub(r"int\s*[’'‘`´]?\s*l\s*(airport)?", "International Airport", cleaned, flags=re.IGNORECASE)
 				destination_airport = cleaned.strip()
-
+	
 			origin_city = self.selenium.request("div.flightPageSummaryOrigin > span.flightPageSummaryCity")
 			if origin_city:
 				origin_city = re.sub(r"\s*/\s*", ", ", origin_city).replace("\n", "").strip()
-
+	
 			destination_city = self.selenium.request("div.flightPageSummaryDestination > span.flightPageSummaryCity")
 			if destination_city:
 				destination_city = re.sub(r"\s*/\s*", ", ", destination_city).replace("\n", "").strip()
@@ -97,7 +97,8 @@ class FlightAwareClient:
 			logging.warning(f"{callsign}: Vol non commercial (codes ou airline absents).")
 		else:
 			logging.warning(f"{callsign}: Statut commercial inconnu (scraping partiel ou page instable).")
-
+	
+		# Retourner un dict prêt à l'insertion dans PostgreSQL
 		return {
 			"callsign": callsign,
 			"airline_name": airline_name,
@@ -111,19 +112,27 @@ class FlightAwareClient:
 		}
 
 	def _get_24h_time_from_string(self, text):
+		"""
+		Transforme une chaîne type '7:30AM', '19:45' en datetime.time ou None si invalide.
+		"""
+		if text is None:
+			return None
+	
 		pattern = r'\d{1,2}:\d{2}(?:AM|PM)?'
 		match = re.search(pattern, text)
-		if match:
-			try:
-				if "AM" in match.group(0) or "PM" in match.group(0):
-					dt_object = datetime.strptime(match.group(0), "%I:%M%p")
-				else:
-					dt_object = datetime.strptime(match.group(0), "%H:%M")
-				return dt_object.strftime("%H:%M")
-			except ValueError:
-				return None
-		return None
-
+		if not match:
+			return None
+	
+		time_str = match.group(0)
+		try:
+			if "AM" in time_str or "PM" in time_str:
+				dt_object = datetime.strptime(time_str, "%I:%M%p")
+			else:
+				dt_object = datetime.strptime(time_str, "%H:%M")
+			return dt_object.time()
+		except ValueError:
+			return None
+	
 	def parse_dynamic_flight(self, callsign, icao24):
 		if not self._prepare_page(callsign, selector="div.flightPageDetails", load_page=False):
 			return None
@@ -175,7 +184,7 @@ class FlightAwareClient:
 			return self._get_24h_time_from_string(val) if val else None
 	
 		dynamic_row = None
-		new_key = (callsign, icao24, current_date, get_scheduled_departure())
+		new_key = f"{callsign}_{icao24}_{current_date}_{get_scheduled_departure()}"
 	
 		# --- CAS 1 : pas de vol précédent ou vol déjà arrivé ---
 		if dynamic is None or dynamic.get("status") == "arrived":

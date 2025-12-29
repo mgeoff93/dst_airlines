@@ -22,13 +22,13 @@ CREATE TABLE flight_dynamic (
 	callsign VARCHAR(10) NOT NULL,
 	icao24 VARCHAR(10) NOT NULL,
 	flight_date DATE NOT NULL,
-	departure_scheduled VARCHAR(5) NOT NULL,
-	departure_actual VARCHAR(5),
-	arrival_scheduled VARCHAR(5),
-	arrival_actual VARCHAR(5),
+	departure_scheduled TIME NOT NULL,
+	departure_actual TIME,
+	arrival_scheduled TIME,
+	arrival_actual TIME,
 	status VARCHAR(10) NOT NULL,
-	last_update TIMESTAMP DEFAULT NOW(),
-	unique_key VARCHAR(64) NOT NULL,
+	last_update TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+	unique_key TEXT NOT NULL,
 
 	CONSTRAINT pk_flight_dynamic PRIMARY KEY (unique_key)
 );
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS live_data (
 	callsign VARCHAR(10) NOT NULL,
 	icao24 VARCHAR(10) NOT NULL,
 	flight_date DATE NOT NULL,
-	departure_scheduled VARCHAR(5) NOT NULL,
+	departure_scheduled TIME NOT NULL,
 	longitude DOUBLE PRECISION,
 	latitude DOUBLE PRECISION,
 	baro_altitude DOUBLE PRECISION,
@@ -59,11 +59,13 @@ CREATE TABLE IF NOT EXISTS live_data (
 	cloud_coverage DOUBLE PRECISION,
 	rain DOUBLE PRECISION,
 	global_condition VARCHAR(100),
+	unique_key TEXT NOT NULL,
 
-	CONSTRAINT pk_live_data PRIMARY KEY (request_id, callsign, icao24, flight_date, departure_scheduled),
-	CONSTRAINT fk_live_dynamic FOREIGN KEY(callsign, icao24, flight_date, departure_scheduled)
-		REFERENCES flight_dynamic(callsign, icao24, flight_date, departure_scheduled)
+	CONSTRAINT pk_live_data PRIMARY KEY (request_id, unique_key),
+	CONSTRAINT fk_live_dynamic FOREIGN KEY(unique_key)
+		REFERENCES flight_dynamic(unique_key)
 );
 
 CREATE INDEX idx_live_callsign ON live_data(callsign);
 CREATE INDEX idx_live_icao24 ON live_data(icao24);
+CREATE INDEX idx_live_unique_key ON live_data(unique_key);

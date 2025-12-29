@@ -63,6 +63,10 @@ def flight_data_pipeline():
 		weathercli = WeatherClient()
 		flightawarecli = FlightAwareClient(seleniumcli, postgrescli)
 	
+		def time_to_str(t):
+			"""Convertit datetime.time en string 'HH:MM:SS', None si absent"""
+			return t.strftime("%H:%M:%S") if t else None
+	
 		try:
 			callsign = flight.get("callsign")
 			icao24 = flight.get("icao24")
@@ -104,6 +108,11 @@ def flight_data_pipeline():
 	
 			# --- Parsing dynamique ---
 			dynamic_row = flightawarecli.parse_dynamic_flight(callsign, icao24)
+			if dynamic_row:
+				# Convertir datetime.time en str pour Airflow XCom
+				for key in ["departure_scheduled", "departure_actual", "arrival_scheduled", "arrival_actual"]:
+					dynamic_row[key] = time_to_str(dynamic_row.get(key))
+	
 			if not dynamic_row or not dynamic_row.get("departure_scheduled"):
 				logging.warning(
 					f"Skipping flight {callsign}: missing departure_scheduled or dynamic data"
@@ -118,6 +127,7 @@ def flight_data_pipeline():
 			live_row["request_id"] = request_id
 			live_row["departure_scheduled"] = dynamic_row["departure_scheduled"]
 			live_row["flight_date"] = dynamic_row["flight_date"]
+			live_row["unique_key"] = dynamic_row["unique_key"]
 	
 			return {
 				"static_rows": [static_row],
