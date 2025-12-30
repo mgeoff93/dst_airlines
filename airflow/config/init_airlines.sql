@@ -5,8 +5,8 @@ CREATE DATABASE airlines;
 CREATE TABLE IF NOT EXISTS flight_static (
 	callsign VARCHAR(10) PRIMARY KEY,
 	airline_name VARCHAR(100),
-	origin_code VARCHAR(3),
-	destination_code VARCHAR(3),
+	origin_code VARCHAR(10),
+	destination_code VARCHAR(10),
 	origin_airport VARCHAR(100),
 	destination_airport VARCHAR(100),
 	origin_city VARCHAR(100),
