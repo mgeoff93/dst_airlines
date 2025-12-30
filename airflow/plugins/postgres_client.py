@@ -55,7 +55,6 @@ class PostgresClient:
 	def insert_flight_static(self, rows):
 		if not rows:
 			return
-		logging.info(f"Inserting {len(rows)} rows into flight_static")
 		query = """
 			INSERT INTO flight_static (
 				callsign, airline_name, origin_code, destination_code,
@@ -68,7 +67,16 @@ class PostgresClient:
 			)
 			ON CONFLICT (callsign) DO NOTHING;
 		"""
-		self.cur.executemany(query, rows)
+
+		for row in rows:
+			try:
+				logging.info(f"Inserting {row} into flight_static")
+				self.cur.execute(query, row)
+			except Exception as e:
+				self.conn.rollback()
+				logging.error(f"Static insert failed for callsign={row.get('callsign')}: {e}", exc_info = True)
+				continue
+			
 		self.conn.commit()
 
 	def insert_flight_dynamic(self, rows):
@@ -78,26 +86,13 @@ class PostgresClient:
 		logging.info(f"Upserting {len(rows)} flight_dynamic rows")
 		query = """
 			INSERT INTO flight_dynamic (
-				callsign,
-				icao24,
-				flight_date,
-				departure_scheduled,
-				departure_actual,
-				arrival_scheduled,
-				arrival_actual,
-				status,
-				unique_key
+				callsign, icao24, flight_date, departure_scheduled, departure_actual,
+				arrival_scheduled, arrival_actual, status, unique_key
 			)
 			VALUES (
-				%(callsign)s,
-				%(icao24)s,
-				%(flight_date)s,
-				%(departure_scheduled)s,
-				%(departure_actual)s,
-				%(arrival_scheduled)s,
-				%(arrival_actual)s,
-				%(status)s,
-				%(unique_key)s
+				%(callsign)s, %(icao24)s, %(flight_date)s, %(departure_scheduled)s,
+				%(departure_actual)s, %(arrival_scheduled)s, %(arrival_actual)s,
+				%(status)s, %(unique_key)s
 			)
 			ON CONFLICT (unique_key)
 			DO UPDATE SET
@@ -111,7 +106,13 @@ class PostgresClient:
 			if not row.get("flight_date") or not row.get("departure_scheduled") or not row.get("unique_key"):
 				logging.warning(f"Skipping dynamic row for {row.get('callsign')} due to missing flight_date, departure_scheduled or unique_key")
 				continue
-			self.cur.execute(query, row)
+			try:
+				logging.info(f"Inserting {row} into flight_dynamic")
+				self.cur.execute(query, row)
+			except Exception as e:
+				self.conn.rollback()
+				logging.error(f"Dynamic insert failed for unique_key={row.get('unique_key')}: {e}", exc_info = True)
+				continue
 
 		self.conn.commit()
 
@@ -137,7 +138,15 @@ class PostgresClient:
 			)
 		"""
 		filtered_rows = [r for r in rows if r.get("flight_date") and r.get("departure_scheduled") and r.get("unique_key")]
-		self.cur.executemany(query, filtered_rows)
+		for row in filtered_rows:
+			try:
+				logging.info(f"Inserting {row} into live_data")
+				self.cur.execute(query, row)
+			except Exception as e:
+				self.conn.rollback()
+				logging.error(f"Live insert failed for request_id={row.get('request_id')}: {e}", exc_info = True)
+				continue
+			
 		self.conn.commit()
 
 	def close(self):
