@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Query
-from postgres_client import PostgresClient
+from api.postgres_client import PostgresClient
 from datetime import date
+from ml import test_ml_module
 
 app = FastAPI(
     title="DST Airlines API",
@@ -181,7 +182,6 @@ def get_full_flight(callsign: str):
         "dynamic": dynamic[0] if dynamic else None,
         "live": live
     }
-
 
 
 

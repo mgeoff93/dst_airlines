@@ -272,11 +272,11 @@ services:
       retries: 5
       start_period: 10s
       
-  fastapi:
+  api:
     build:
-      context: ./fastapi
-      dockerfile: Dockerfile
-    container_name: fastapi
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: api
     ports:
       - "8000:8000"
     environment:
