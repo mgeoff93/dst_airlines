@@ -21,6 +21,8 @@ class FlightAwareClient:
 	FLIGHTAWARE_BASE_URL = "FLIGHTAWARE_BASE_URL"
 	SELENIUM_WAIT_TIME = "SELENIUM_WAIT_TIME"
 
+	CODE_REGEX = re.compile(r"^[A-Z]{3}$")
+
 	def __init__(self, selenium_client: SeleniumClient, postgres_client: PostgresClient):
 		self.base_url = Variable.get(self.FLIGHTAWARE_BASE_URL)
 		self.wait_time = int(Variable.get(self.SELENIUM_WAIT_TIME, default_var=10))
@@ -47,6 +49,17 @@ class FlightAwareClient:
 		except TimeoutException:
 			logging.warning(f"{callsign}: Page FlightAware non prête (timeout sur '{selector}').")
 			return False
+		
+	def _normalize_airport_code(self, value):
+		if not value:
+			return None
+
+		value = str(value).strip().upper()
+
+		if self.CODE_REGEX.match(value):
+			return value
+
+		return None
 
 	def parse_static_flight(self, callsign):
 		logging.info(f"{callsign}: Début du parsing statique.")
@@ -54,19 +67,21 @@ class FlightAwareClient:
 			return None
 	
 		try:
-			airline_name = self.selenium.request(
-				"div.flightPageDetails > div:nth-child(9) > div:nth-child(2) > div > div > div:nth-child(2) a"
-			)
-			origin_code = self.selenium.request("div.flightPageSummaryOrigin > span.flightPageSummaryAirportCode span")
-			destination_code = self.selenium.request("div.flightPageSummaryDestination > span.flightPageSummaryAirportCode span")
+			airline_name = self.selenium.request("div.flightPageDetails > div:nth-child(9) > div:nth-child(2) > div > div > div:nth-child(2) a")
+			origin_code_raw = self.selenium.request("div.flightPageSummaryOrigin > span.flightPageSummaryAirportCode span")
+			destination_code_raw = self.selenium.request("div.flightPageSummaryDestination > span.flightPageSummaryAirportCode span")
 		except Exception as e:
 			logging.debug(f"{callsign}: Erreur récupération codes/airline. {e}")
-			airline_name = origin_code = destination_code = None
-	
+			airline_name = origin_code_raw = destination_code_raw = None
+
+		origin_code = self._normalize_airport_code(origin_code_raw)
+		destination_code = self._normalize_airport_code(destination_code_raw)
+		
 		scraping_ok = any([airline_name, origin_code, destination_code])
+
 		if not scraping_ok:
 			commercial = None
-		elif all(v and str(v).strip() for v in (airline_name, origin_code, destination_code)):
+		elif airline_name and origin_code and destination_code:
 			commercial = True
 		else:
 			commercial = False
