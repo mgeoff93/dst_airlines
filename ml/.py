@@ -191,5 +191,23 @@ done_filtered = done[done["callsign"] == CALLSIGN].sort_values("departure_schedu
 # --- Chargement des données ---
 ids = current_filtered["unique_key"].tolist() + done_filtered["unique_key"].tolist()
 sql = "SELECT * FROM live_data WHERE unique_key = ANY(%s)"
-rows = pd.DataFrame(db.query(sql, (ids,)))
+live = pd.DataFrame(db.query(sql, (ids,)))
 
+# Colonnes à récupérer depuis done_filtered
+cols_to_add = [
+    "unique_key", 
+    "departure_difference", 
+    "arrival_difference", 
+    "departure_status", 
+    "arrival_status"
+]
+
+# Merge sur 'unique_key'
+live_enriched = live.merge(
+    done_filtered[cols_to_add],
+    on="unique_key",
+    how="left"  # garde toutes les lignes de live_filtered
+)
+
+train = 
+test = 
