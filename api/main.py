@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException, Query
 from api.postgres_client import PostgresClient
 from datetime import date
-from ml import test_ml_module
 
 app = FastAPI(
     title="DST Airlines API",
