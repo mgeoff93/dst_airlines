@@ -25,17 +25,12 @@ x-airflow-common:
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
-
-    # Logs uniquement en DB
     AIRFLOW__LOGGING__REMOTE_LOGGING: 'false'
     AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER: ''
     AIRFLOW__LOGGING__TASK_LOGGER: 'airflow.utils.log.task_handler.DbTaskHandler'
     AIRFLOW__LOGGING__HANDLER: 'airflow.utils.log.task_handler.DbTaskHandler'
-
-    # Plugins et MLflow
     PYTHONPATH: "${AIRFLOW_PROJ_DIR:-.}/plugins"
     MLFLOW_TRACKING_URI: http://mlflow:5000
-
   volumes:
     - ./airflow/dags:/opt/airflow/dags
     - ./airflow/config:/opt/airflow/config
@@ -48,6 +43,8 @@ x-airflow-common:
     redis:
       condition: service_healthy
     postgres:
+      condition: service_healthy
+    selenium:
       condition: service_healthy
 
 services:
@@ -83,6 +80,22 @@ services:
       - airflow_network
     restart: always
 
+  selenium:
+    image: selenium/standalone-chrome:latest
+    container_name: selenium
+    ports:
+      - "4444:4444"
+    shm_size: 2gb
+    restart: always
+    networks:
+      - airflow_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:4444/wd/hub/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
   airflow-apiserver:
     <<: *airflow-common
     command: api-server
@@ -95,29 +108,21 @@ services:
       retries: 5
       start_period: 30s
     restart: always
-    depends_on:
-      <<: *airflow-common-depends-on
 
   airflow-scheduler:
     <<: *airflow-common
     command: scheduler
     restart: always
-    depends_on:
-      <<: *airflow-common-depends-on
 
   airflow-worker:
     <<: *airflow-common
     command: celery worker
     restart: always
-    depends_on:
-      <<: *airflow-common-depends-on
 
   airflow-triggerer:
     <<: *airflow-common
     command: triggerer
     restart: always
-    depends_on:
-      <<: *airflow-common-depends-on
 
   airflow-init:
     <<: *airflow-common
@@ -137,6 +142,7 @@ services:
       _AIRFLOW_WWW_USER_CREATE: 'true'
       _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
       _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
+      _PIP_ADDITIONAL_REQUIREMENTS: ''
     user: "0:0"
 
   mlflow:
