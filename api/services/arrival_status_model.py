@@ -1,34 +1,19 @@
-import pandas as pd
-import numpy as np
-import pickle
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import OneHotEncoder
+# import mlflow.sklearn
+# import pandas as pd
 
-def train_model(done_df: pd.DataFrame):
-	df = done_df.copy()
-	# Colonnes numériques
-	num_features = ["departure_difference", "arrival_difference"]
-	X_num = df[num_features].fillna(0)
+# # Charger le modèle MLflow Production au démarrage
+# MODEL_NAME = "arrival_status_prediction"
+# MODEL_STAGE = "Production"
 
-	# Colonnes catégoriques
-	cat_features = ["departure_status", "arrival_status"]
-	encoder = OneHotEncoder(handle_unknown="ignore", sparse=False)
-	X_cat = encoder.fit_transform(df[cat_features].fillna("unknown"))
+# def load_model():
+# 	return mlflow.sklearn.load_model(f"models:/{MODEL_NAME}/{MODEL_STAGE}")
 
-	X = np.hstack([X_num.values, X_cat])
-	y = df["arrival_status"]
+# model = load_model()
 
-	model = RandomForestClassifier(n_estimators=100, random_state=42)
-	model.fit(X, y)
-
-	return model
-
-def predict(model, encoder, num_features, df: pd.DataFrame) -> pd.DataFrame:
-	X_num = df[num_features].fillna(0)
-	cat_features = ["departure_status", "arrival_status"]
-	X_cat = encoder.transform(df[cat_features].fillna("unknown"))
-	X = np.hstack([X_num.values, X_cat])
-
-	df = df.copy()
-	df["arrival_status_pred"] = model.predict(X)
-	return df
+# def predict(features: pd.DataFrame):
+# 	"""
+# 	features: dataframe avec colonnes static/dynamic/live comme discuté
+# 	retourne la prédiction arrival_status
+# 	"""
+# 	preds = model.predict(features)
+# 	return preds

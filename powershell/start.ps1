@@ -28,6 +28,7 @@ Write-Host "===================================" -ForegroundColor Green
 Write-Host "Access Points:" -ForegroundColor Green
 Write-Host "===================================" -ForegroundColor Green
 Write-Host "- Airflow UI:  http://localhost:8080 (airflow/airflow)" -ForegroundColor White
+Write-Host "- MLFlowUI:    http://localhost:5000" -ForegroundColor White
 Write-Host "- FastAPI:     http://localhost:8000/docs" -ForegroundColor White
 Write-Host "- PostgreSQL:  localhost:5432 (airflow/airflow)" -ForegroundColor White
 Write-Host ""

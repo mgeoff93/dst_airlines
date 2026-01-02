@@ -1,10 +1,6 @@
-# api/services/flight_features.py
-
 import pandas as pd
 import numpy as np
-
-# Seuil pour considérer un vol comme "stale" (hors ligne)
-STALE_THRESHOLD = pd.Timedelta(minutes=30)
+from api.core.config import STALE_THRESHOLD
 
 def categorize_delay(x):
 	"""
