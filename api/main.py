@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Query
 from api.postgres_client import PostgresClient
+from api.routes.flights import router as flights_router
 from datetime import date
 
 app = FastAPI(
@@ -7,6 +8,8 @@ app = FastAPI(
     description="API REST pour suivi des vols en temps réel",
     version="1.0.0"
 )
+
+app.include_router(flights_router)
 
 db = PostgresClient()
 
