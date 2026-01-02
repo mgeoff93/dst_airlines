@@ -21,7 +21,7 @@ def train_model(done_df: pd.DataFrame):
 	model = RandomForestClassifier(n_estimators=100, random_state=42)
 	model.fit(X, y)
 
-	return model, encoder, num_features
+	return model
 
 def predict(model, encoder, num_features, df: pd.DataFrame) -> pd.DataFrame:
 	X_num = df[num_features].fillna(0)
