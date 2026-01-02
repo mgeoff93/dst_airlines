@@ -1,25 +1,20 @@
-# api/routers/live.py
-
 from fastapi import APIRouter, Query
 from typing import Optional
 from api.core.database import db
 from api.services import flight_features
 import pandas as pd
 
-router = APIRouter(tags=["Live Data"])
+router = APIRouter(tags=["Live metadatas"])
 
 def get_current_subset():
-	"""
-	Récupère tous les live_data puis construit current
-	"""
 	sql = "SELECT * FROM flight_dynamic ORDER BY last_update DESC"
 	all_flights = pd.DataFrame(db.query(sql))
 	datasets = flight_features.build_flight_datasets(all_flights)
-	return datasets["current"]  # liste de dicts
+	return datasets["current"]
 
-# GPS / light
-@router.get("/live/gps")
-def get_live_gps():
+# Toutes les métadonnées
+@router.get("/live/all_metadatas")
+def get_live_all_metadatas():
 	current_rows = get_current_subset()
 
 	if not current_rows:
@@ -39,16 +34,14 @@ def get_live_gps():
 
 	return {"count": len(live_rows), "data": live_rows}
 
-# Position / vol réel
-@router.get("/live/position")
-def get_live_position():
-	# 1. récupère la subset “current”
+# Métadonnées positionnelles
+@router.get("/live/position_metadatas")
+def get_live_position_metadatas():
 	current_rows = get_current_subset()
 
 	if not current_rows:
 		return {"count": 0, "data": []}
 
-	# 2. construire la liste des tuples pour IN
 	tuples = [(r["unique_key"], r["callsign"], r["icao24"]) for r in current_rows]
 	params = [item for t in tuples for item in t]  # aplatir pour psycopg2
 
@@ -64,15 +57,13 @@ def get_live_position():
 	return {"count": len(live_rows), "data": live_rows}
 
 # Météo / environnement
-@router.get("/live/weather")
-def get_live_weather():
-	# 1. récupère la subset “current”
+@router.get("/live/weather_metadatas")
+def get_live_weather_metadatas():
 	current_rows = get_current_subset()
 
 	if not current_rows:
 		return {"count": 0, "data": []}
 
-	# 2. construire la liste des tuples pour IN
 	tuples = [(r["unique_key"], r["callsign"], r["icao24"]) for r in current_rows]
 	params = [item for t in tuples for item in t]  # aplatir pour psycopg2
 
@@ -89,15 +80,13 @@ def get_live_weather():
 	return {"count": len(live_rows), "data": live_rows}
 
 # Position / vol réel
-@router.get("/live/summary")
-def get_live_position():
-	# 1. récupère la subset “current”
+@router.get("/live/light")
+def get_live_light():
 	current_rows = get_current_subset()
 
 	if not current_rows:
 		return {"count": 0, "data": []}
 
-	# 2. construire la liste des tuples pour IN
 	tuples = [(r["unique_key"], r["callsign"], r["icao24"]) for r in current_rows]
 	params = [item for t in tuples for item in t]  # aplatir pour psycopg2
 

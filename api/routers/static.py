@@ -4,17 +4,13 @@ from api.core.database import db
 from api.services import flight_features
 import pandas as pd
 
-router = APIRouter(tags=["Static Metadatas"])
-
+router = APIRouter(tags=["Static metadatas"])
 
 def get_current_subset():
-	"""
-	Récupère flight_dynamic, calcule les datasets et retourne uniquement `current`
-	"""
 	sql = "SELECT * FROM flight_dynamic ORDER BY last_update DESC"
 	all_flights = pd.DataFrame(db.query(sql))
 	datasets = flight_features.build_flight_datasets(all_flights)
-	return datasets["current"]  # liste de dicts
+	return datasets["current"]
 
 
 @router.get("/static")
@@ -24,11 +20,6 @@ def get_static_flights(
 	airline_name: Optional[str] = None,
 	limit: int = Query(100, ge=1, le=1000)
 ):
-	"""
-	Retourne les vols statiques (flight_static) uniquement pour les vols en cours,
-	avec filtres optionnels.
-	"""
-
 	# --- récupérer les callsigns en cours ---
 	current_rows = get_current_subset()
 	current_callsigns = {row["callsign"] for row in current_rows if row.get("callsign")}

@@ -1,6 +1,7 @@
 # api/services/flight_features.py
 
 import pandas as pd
+import numpy as np
 
 # Seuil pour considérer un vol comme "stale" (hors ligne)
 STALE_THRESHOLD = pd.Timedelta(minutes=30)
@@ -13,7 +14,7 @@ def categorize_delay(x):
 	- "on time" sinon
 	"""
 	if pd.isna(x):
-		return pd.NA
+		return None # Remplacé pd.NA par None
 	if x > 10:
 		return "late"
 	elif x < -10:
@@ -22,11 +23,7 @@ def categorize_delay(x):
 
 
 def dataframe_to_list_of_dicts(df: pd.DataFrame) -> list:
-	"""
-	Convertit un DataFrame Pandas en liste de dictionnaires Python,
-	avec les valeurs nulles remplacées par None.
-	"""
-	return df.where(pd.notna(df), None).to_dict(orient="records")
+	return df.replace({np.nan: None}).where(pd.notna(df), None).to_dict(orient="records")
 
 def build_flight_datasets(all_flights: pd.DataFrame) -> dict:
 	"""
@@ -90,7 +87,8 @@ def build_flight_datasets(all_flights: pd.DataFrame) -> dict:
 		]
 	].copy()
 
-	normalized = normalized.where(normalized.notna(), pd.NA)
+	# Changement critique : On évite pd.NA qui casse le JSON
+	normalized = normalized.where(pd.notna(normalized), None)
 
 	# --- datasets métier ---
 	done = normalized[
@@ -113,7 +111,6 @@ def build_flight_datasets(all_flights: pd.DataFrame) -> dict:
 	].copy()
 
 	return {
-		"normalized": dataframe_to_list_of_dicts(normalized),
 		"done": dataframe_to_list_of_dicts(done),
 		"current": dataframe_to_list_of_dicts(current)
 	}
