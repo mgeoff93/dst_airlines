@@ -1,0 +1,119 @@
+# api/services/flight_features.py
+
+import pandas as pd
+
+# Seuil pour considérer un vol comme "stale" (hors ligne)
+STALE_THRESHOLD = pd.Timedelta(minutes=30)
+
+def categorize_delay(x):
+	"""
+	Catégorise le retard :
+	- "late" si > 10 min
+	- "early" si < -10 min
+	- "on time" sinon
+	"""
+	if pd.isna(x):
+		return pd.NA
+	if x > 10:
+		return "late"
+	elif x < -10:
+		return "early"
+	return "on time"
+
+
+def dataframe_to_list_of_dicts(df: pd.DataFrame) -> list:
+	"""
+	Convertit un DataFrame Pandas en liste de dictionnaires Python,
+	avec les valeurs nulles remplacées par None.
+	"""
+	return df.where(pd.notna(df), None).to_dict(orient="records")
+
+def build_flight_datasets(all_flights: pd.DataFrame) -> dict:
+	"""
+	Prétraite flight_dynamic pour produire :
+	- normalized : toutes les lignes
+	- done : vols arrivés
+	- current : vols en cours
+	"""
+
+	df = all_flights.copy()
+
+	# --- timestamps départ ---
+	df["departure_scheduled_ts"] = pd.to_datetime(
+		df["flight_date"].astype(str) + " " + df["departure_scheduled"].astype(str),
+		errors="coerce"
+	)
+	df["departure_actual_ts"] = pd.to_datetime(
+		df["flight_date"].astype(str) + " " + df["departure_actual"].astype(str),
+		errors="coerce"
+	)
+
+	departure_next_day = (
+		df["departure_actual_ts"].notna() &
+		df["departure_scheduled_ts"].notna() &
+		(df["departure_actual_ts"] < df["departure_scheduled_ts"])
+	)
+	df.loc[departure_next_day, "departure_actual_ts"] += pd.Timedelta(days=1)
+
+	# --- timestamps arrivée ---
+	arrival_same_day = df["arrival_scheduled"] >= df["departure_scheduled"]
+
+	df["arrival_scheduled_ts"] = pd.to_datetime(
+		df["flight_date"].astype(str) + " " + df["arrival_scheduled"].astype(str),
+		errors="coerce"
+	)
+	df.loc[~arrival_same_day, "arrival_scheduled_ts"] += pd.Timedelta(days=1)
+
+	df["arrival_actual_ts"] = pd.to_datetime(
+		df["flight_date"].astype(str) + " " + df["arrival_actual"].astype(str),
+		errors="coerce"
+	)
+	df.loc[(~arrival_same_day) & df["arrival_actual_ts"].notna(), "arrival_actual_ts"] += pd.Timedelta(days=1)
+
+	# --- différences ---
+	df["departure_difference"] = (df["departure_actual_ts"] - df["departure_scheduled_ts"]).dt.total_seconds() / 60
+	df["arrival_difference"] = (df["arrival_actual_ts"] - df["arrival_scheduled_ts"]).dt.total_seconds() / 60
+
+	# --- statuts ---
+	df["departure_status"] = df["departure_difference"].apply(categorize_delay)
+	df["arrival_status"] = df["arrival_difference"].apply(categorize_delay)
+
+	# --- sélection finale ---
+	normalized = df[
+		[
+			"unique_key", "callsign", "icao24", "status",
+			"departure_scheduled_ts", "departure_actual_ts",
+			"arrival_scheduled_ts", "arrival_actual_ts",
+			"departure_difference", "arrival_difference",
+			"departure_status", "arrival_status",
+			"last_update"
+		]
+	].copy()
+
+	normalized = normalized.where(normalized.notna(), pd.NA)
+
+	# --- datasets métier ---
+	done = normalized[
+		(normalized["status"] == "arrived") &
+		normalized["arrival_status"].notna()
+	].copy()
+
+	now = pd.Timestamp.utcnow().tz_localize(None)
+
+	current = normalized[
+		normalized["status"].isin(["departing", "en route"])
+	].copy()
+
+	current = current[
+		~(
+			current["arrival_actual_ts"].isna() &
+			(now > current["arrival_scheduled_ts"]) &
+			((now - current["last_update"]) > STALE_THRESHOLD)
+		)
+	].copy()
+
+	return {
+		"normalized": dataframe_to_list_of_dicts(normalized),
+		"done": dataframe_to_list_of_dicts(done),
+		"current": dataframe_to_list_of_dicts(current)
+	}

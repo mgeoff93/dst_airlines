@@ -1,0 +1,39 @@
+J'ai :
+
+airlines-# \d flight_static
+                         Table "public.flight_static"
+       Column        |          Type          | Collation | Nullable | Default 
+---------------------+------------------------+-----------+----------+---------
+ callsign            | character varying(10)  |           | not null | 
+ airline_name        | character varying(100) |           |          | 
+ origin_code         | character varying(3)   |           |          | 
+ destination_code    | character varying(3)   |           |          | 
+ origin_airport      | character varying(100) |           |          | 
+ destination_airport | character varying(100) |           |          | 
+ origin_city         | character varying(100) |           |          | 
+ destination_city    | character varying(100) |           |          | 
+ commercial_flight   | boolean                |           |          | 
+Indexes:
+    "flight_static_pkey" PRIMARY KEY, btree (callsign)
+    "idx_static_airline" btree (airline_name)
+    "idx_static_dest" btree (destination_code)
+    "idx_static_origin" btree (origin_code)
+
+Je veux :
+
+airlines-# \d flight_static
+                         Table "public.flight_static"
+       Column        |          Type          | Collation | Nullable | Default 
+---------------------+------------------------+-----------+----------+---------
+ callsign            | character varying(10)  |           | not null | 
+ airline_name        | character varying(100) |           |          | 
+ origin_code         | character varying(3)   |           |          | 
+ destination_code    | character varying(3)   |           |          | 
+ origin_airport      | character varying(100) |           |          | 
+ destination_airport | character varying(100) |           |          | 
+ origin_city         | character varying(100) |           |          | 
+ destination_city    | character varying(100) |           |          | 
+ commercial_flight   | boolean                |           |          |
+
+Avec filtrage possible sur origin_code, destination_code et airline_name
+Qu'en penses-tu ?
