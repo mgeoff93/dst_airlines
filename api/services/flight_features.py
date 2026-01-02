@@ -123,37 +123,37 @@ def build_flight_datasets(all_flights: pd.DataFrame) -> dict:
 		)
 	].copy()
 
-	def prepare_train_test(done: pd.DataFrame, current: pd.DataFrame, db) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
-		
-		# --- Filtrer les unique_key ---
-		ids = current["unique_key"].tolist() + done["unique_key"].tolist()
+	return {
+		"normalized": normalized,
+		"done": done,
+		"current": current
+	}
 
-		# --- Charger live_data pour ces vols ---
-		sql = "SELECT * FROM live_data WHERE unique_key = ANY(%s)"
-		live = pd.DataFrame(db.query(sql, (ids,)))
-
-		# --- Colonnes à récupérer depuis done ---
-		cols_to_add = [
-			"unique_key",
-			"departure_difference",
-			"arrival_difference",
-			"departure_status",
-			"arrival_status"
-		]
-
-		# --- Enrichir live_data avec done ---
-		live_enriched = live.merge(
-			done[cols_to_add],
-			on="unique_key",
-			how="left"  # garde toutes les lignes de live
-		)
-
-		# --- Créer X_train / y_train pour le modèle ---
-		X_train = live_enriched[live_enriched["arrival_status"].notna()].copy()
-		y_train = X_train["arrival_status"]
-
-		# --- Créer X_test : lignes correspondant à current ---
-		current_keys = current["unique_key"].tolist()
-		X_test = live_enriched[live_enriched["unique_key"].isin(current_keys)].copy()
-
-		return X_train, y_train, X_test
+def prepare_train_test(done: pd.DataFrame, current: pd.DataFrame, db) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
+	
+	# --- Filtrer les unique_key ---
+	ids = current["unique_key"].tolist() + done["unique_key"].tolist()
+	# --- Charger live_data pour ces vols ---
+	sql = "SELECT * FROM live_data WHERE unique_key = ANY(%s)"
+	live = pd.DataFrame(db.query(sql, (ids,)))
+	# --- Colonnes à récupérer depuis done ---
+	cols_to_add = [
+		"unique_key",
+		"departure_difference",
+		"arrival_difference",
+		"departure_status",
+		"arrival_status"
+	]
+	# --- Enrichir live_data avec done ---
+	live_enriched = live.merge(
+		done[cols_to_add],
+		on="unique_key",
+		how="left"  # garde toutes les lignes de live
+	)
+	# --- Créer X_train / y_train pour le modèle ---
+	X_train = live_enriched[live_enriched["arrival_status"].notna()].copy()
+	y_train = X_train["arrival_status"]
+	# --- Créer X_test : lignes correspondant à current ---
+	current_keys = current["unique_key"].tolist()
+	X_test = live_enriched[live_enriched["unique_key"].isin(current_keys)].copy()
+	return X_train, y_train, X_test
