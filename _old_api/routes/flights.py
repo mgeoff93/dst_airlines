@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Query, HTTPException
 import pandas as pd
 import requests
-from api.postgres_client import PostgresClient
-from api.services.flight_features import dataframe_to_json_safe, build_flight_datasets, prepare_train_test
+from _old_api.postgres_client import PostgresClient
+from _old_api.services.flight_features import dataframe_to_json_safe, build_flight_datasets, prepare_train_test
 from ml.arrival_status_model import train_model, predict
 
 router = APIRouter(prefix="/flights", tags=["Flights"])
