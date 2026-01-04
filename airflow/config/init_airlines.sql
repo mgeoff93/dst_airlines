@@ -1,3 +1,5 @@
+CREATE DATABASE mlflow;
+
 CREATE DATABASE airlines;
 
 \c airlines;
