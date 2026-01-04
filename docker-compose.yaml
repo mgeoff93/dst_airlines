@@ -4,7 +4,6 @@ networks:
 
 volumes:
   postgres-db-volume:
-  mlruns:
 
 x-airflow-common:
   &airflow-common
@@ -30,7 +29,6 @@ x-airflow-common:
     AIRFLOW__LOGGING__TASK_LOGGER: 'airflow.utils.log.task_handler.DbTaskHandler'
     AIRFLOW__LOGGING__HANDLER: 'airflow.utils.log.task_handler.DbTaskHandler'
     PYTHONPATH: "${AIRFLOW_PROJ_DIR:-.}/plugins"
-    MLFLOW_TRACKING_URI: http://mlflow:5000
   volumes:
     - ./airflow/dags:/opt/airflow/dags
     - ./airflow/config:/opt/airflow/config
@@ -144,20 +142,6 @@ services:
       _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
       _PIP_ADDITIONAL_REQUIREMENTS: ''
     user: "0:0"
-
-  mlflow:
-    build:
-      context: ./mlflow
-    container_name: mlflow
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./mlruns:/app/mlruns
-    networks:
-      - airflow_network
-    environment:
-      MLFLOW_TRACKING_URI: http://mlflow:5000
-    restart: always
 
   api:
     build:
