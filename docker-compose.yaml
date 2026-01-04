@@ -105,8 +105,8 @@ services:
       ports:
         - "5000:5000"
       environment:
-            - MLFLOW_BACKEND_STORE_URI=postgresql+psycopg2://airflow:airflow@postgres:5432/mlflow
-            - MLFLOW_ARTIFACT_ROOT=/mlflow/artifacts
+        - MLFLOW_BACKEND_STORE_URI=postgresql+psycopg2://airflow:airflow@postgres:5432/mlflow
+        - MLFLOW_ARTIFACT_ROOT=/mlflow/artifacts
       volumes:
         - mlflow_artifacts:/mlflow/artifacts
       networks:
@@ -115,11 +115,13 @@ services:
         postgres:
           condition: service_healthy
       command: >
-            mlflow server 
-            --backend-store-uri postgresql+psycopg2://airflow:airflow@postgres:5432/mlflow
-            --default-artifact-root /mlflow/artifacts 
-            --host 0.0.0.0 
-            --port 5000
+        mlflow server
+        --backend-store-uri postgresql+psycopg2://airflow:airflow@postgres:5432/mlflow
+        --default-artifact-root /mlflow/artifacts
+        --host 0.0.0.0
+        --port 5000
+        --allowed-hosts "*"
+        --cors-allowed-origins "*"
       restart: always
 
   airflow-apiserver:
@@ -127,6 +129,8 @@ services:
     command: api-server
     ports:
       - "8080:8080"
+    networks:
+      - airflow_network
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/version"]
       interval: 30s
@@ -134,21 +138,55 @@ services:
       retries: 5
       start_period: 30s
     restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      selenium:
+        condition: service_healthy
 
   airflow-scheduler:
     <<: *airflow-common
     command: scheduler
+    networks:
+      - airflow_network
     restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      selenium:
+        condition: service_healthy
 
   airflow-worker:
     <<: *airflow-common
     command: celery worker
+    networks:
+      - airflow_network
     restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      selenium:
+        condition: service_healthy
 
   airflow-triggerer:
     <<: *airflow-common
     command: triggerer
+    networks:
+      - airflow_network
     restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      selenium:
+        condition: service_healthy
 
   airflow-init:
     <<: *airflow-common
