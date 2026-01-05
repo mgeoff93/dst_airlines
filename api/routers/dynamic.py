@@ -14,8 +14,7 @@ def get_datasets():
 @router.get("/dynamic")
 def get_dynamic_flights(
 	status: Optional[str] = None,  # "history" ou "live"
-	callsign: Optional[str] = None,
-	limit: int = Query(100, ge=1, le=1000)
+	callsign: Optional[str] = None
 ):
 	if status not in (None, "live", "history"):
 		raise HTTPException(status_code=400, detail="status must be 'live' or 'history'")
@@ -36,9 +35,6 @@ def get_dynamic_flights(
 
 	# --- tri cohérent ---
 	rows = sorted(rows, key=lambda r: r.get("last_update") or "", reverse=True)
-
-	# --- limite ---
-	rows = rows[:limit]
 
 	return {
 		"count": len(rows),

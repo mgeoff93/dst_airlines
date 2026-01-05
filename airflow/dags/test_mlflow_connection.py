@@ -1,4 +1,4 @@
-from airflow.decorators import dag, task # <--- Il manquait 'dag' ici
+from airflow.decorators import dag, task
 from datetime import datetime
 import mlflow
 import logging

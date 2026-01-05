@@ -7,95 +7,131 @@ import pandas as pd
 router = APIRouter(tags=["Live metadatas"])
 
 def get_current_subset():
-	sql = "SELECT * FROM flight_dynamic ORDER BY last_update DESC"
-	all_flights = pd.DataFrame(db.query(sql))
-	datasets = flight_features.build_flight_datasets(all_flights)
-	return datasets["current"]
+    sql = "SELECT * FROM flight_dynamic ORDER BY last_update DESC"
+    all_flights = pd.DataFrame(db.query(sql))
+    datasets = flight_features.build_flight_datasets(all_flights)
+    return datasets["current"]
 
 # Toutes les métadonnées
-@router.get("/live/all_metadatas")
-def get_live_all_metadatas():
-	current_rows = get_current_subset()
 
-	if not current_rows:
-		return {"count": 0, "data": []}
+@router.get("/live/history/all")
+def get_live_history_all(callsign: Optional[str] = Query(None)):
+    current_rows = get_current_subset()
 
-	tuples = [(r["unique_key"], r["callsign"], r["icao24"]) for r in current_rows]
-	params = [item for t in tuples for item in t]  # aplatir pour psycopg2
+    # Si pas de lignes actuelles, retourne tout (éventuellement filtré)
+    sql = "SELECT * FROM live_data"
+    params = []
 
-	in_clause = ",".join(["(%s,%s,%s)"] * len(tuples))
-	sql = f"""
-		SELECT *
-		FROM live_data
-		WHERE (unique_key, callsign, icao24) IN ({in_clause})
-		ORDER BY request_id DESC
-	"""
-	live_rows = db.query(sql, tuple(params))
+    if current_rows:
+        tuples_to_exclude = [(r["unique_key"], r["callsign"], r["icao24"]) for r in current_rows]
+        in_clause = ",".join(["(%s,%s,%s)"] * len(tuples_to_exclude))
+        sql += f" WHERE (unique_key, callsign, icao24) NOT IN ({in_clause})"
+        params.extend([item for t in tuples_to_exclude for item in t])
 
-	return {"count": len(live_rows), "data": live_rows}
+    # Filtre callsign optionnel
+    if callsign:
+        sql += " AND callsign = %s" if "WHERE" in sql else " WHERE callsign = %s"
+        params.append(callsign)
 
-# Métadonnées positionnelles
-@router.get("/live/position_metadatas")
-def get_live_position_metadatas():
-	current_rows = get_current_subset()
+    sql += " ORDER BY request_id DESC"
+    live_rows = db.query(sql, tuple(params))
+    return {"count": len(live_rows), "data": live_rows}
 
-	if not current_rows:
-		return {"count": 0, "data": []}
+# Toutes les métadonnées (current)
 
-	tuples = [(r["unique_key"], r["callsign"], r["icao24"]) for r in current_rows]
-	params = [item for t in tuples for item in t]  # aplatir pour psycopg2
+@router.get("/live/current/all")
+def get_live_current_all(callsign: Optional[str] = Query(None)):
+    current_rows = get_current_subset()
+    if not current_rows:
+        return {"count": 0, "data": []}
 
-	in_clause = ",".join(["(%s,%s,%s)"] * len(tuples))
-	sql = f"""
-		SELECT request_id, callsign, icao24, longitude, latitude,
-			   baro_altitude, geo_altitude, on_ground, velocity, vertical_rate, unique_key
-		FROM live_data
-		WHERE (unique_key, callsign, icao24) IN ({in_clause})
-		ORDER BY request_id DESC
-	"""
-	live_rows = db.query(sql, tuple(params))
-	return {"count": len(live_rows), "data": live_rows}
+    tuples = [(r["unique_key"], r["callsign"], r["icao24"]) for r in current_rows]
+    in_clause = ",".join(["(%s,%s,%s)"] * len(tuples))
+    sql = f"SELECT * FROM live_data WHERE (unique_key, callsign, icao24) IN ({in_clause})"
+    params = [item for t in tuples for item in t]
 
-# Météo / environnement
-@router.get("/live/weather_metadatas")
-def get_live_weather_metadatas():
-	current_rows = get_current_subset()
+    if callsign:
+        sql += " AND callsign = %s"
+        params.append(callsign)
 
-	if not current_rows:
-		return {"count": 0, "data": []}
+    sql += " ORDER BY request_id DESC"
+    live_rows = db.query(sql, tuple(params))
+    return {"count": len(live_rows), "data": live_rows}
 
-	tuples = [(r["unique_key"], r["callsign"], r["icao24"]) for r in current_rows]
-	params = [item for t in tuples for item in t]  # aplatir pour psycopg2
+# Position / current
 
-	in_clause = ",".join(["(%s,%s,%s)"] * len(tuples))
-	sql = f"""
-		SELECT request_id, callsign, icao24, longitude, latitude,
-			   wind_speed, gust_speed, visibility, cloud_coverage, rain,
-			   global_condition, unique_key
-		FROM live_data
-		WHERE (unique_key, callsign, icao24) IN ({in_clause})
-		ORDER BY request_id DESC
-	"""
-	live_rows = db.query(sql, tuple(params))
-	return {"count": len(live_rows), "data": live_rows}
+@router.get("/live/current/position")
+def get_live_current_position(callsign: Optional[str] = Query(None)):
+    current_rows = get_current_subset()
+    if not current_rows:
+        return {"count": 0, "data": []}
 
-# Position / vol réel
-@router.get("/live/light")
-def get_live_light():
-	current_rows = get_current_subset()
+    tuples = [(r["unique_key"], r["callsign"], r["icao24"]) for r in current_rows]
+    in_clause = ",".join(["(%s,%s,%s)"] * len(tuples))
+    sql = f"""
+        SELECT request_id, callsign, icao24, longitude, latitude,
+               baro_altitude, geo_altitude, on_ground, velocity, vertical_rate, unique_key
+        FROM live_data
+        WHERE (unique_key, callsign, icao24) IN ({in_clause})
+    """
+    params = [item for t in tuples for item in t]
 
-	if not current_rows:
-		return {"count": 0, "data": []}
+    if callsign:
+        sql += " AND callsign = %s"
+        params.append(callsign)
 
-	tuples = [(r["unique_key"], r["callsign"], r["icao24"]) for r in current_rows]
-	params = [item for t in tuples for item in t]  # aplatir pour psycopg2
+    sql += " ORDER BY request_id DESC"
+    live_rows = db.query(sql, tuple(params))
+    return {"count": len(live_rows), "data": live_rows}
 
-	in_clause = ",".join(["(%s,%s,%s)"] * len(tuples))
-	sql = f"""
-		SELECT request_id, callsign, icao24, longitude, latitude, global_condition, unique_key
-		FROM live_data
-		WHERE (unique_key, callsign, icao24) IN ({in_clause})
-		ORDER BY request_id DESC
-	"""
-	live_rows = db.query(sql, tuple(params))
-	return {"count": len(live_rows), "data": live_rows}
+# Weather / current
+
+@router.get("/live/current/weather")
+def get_live_current_weather(callsign: Optional[str] = Query(None)):
+    current_rows = get_current_subset()
+    if not current_rows:
+        return {"count": 0, "data": []}
+
+    tuples = [(r["unique_key"], r["callsign"], r["icao24"]) for r in current_rows]
+    in_clause = ",".join(["(%s,%s,%s)"] * len(tuples))
+    sql = f"""
+        SELECT request_id, callsign, icao24, longitude, latitude,
+               wind_speed, gust_speed, visibility, cloud_coverage, rain,
+               global_condition, unique_key
+        FROM live_data
+        WHERE (unique_key, callsign, icao24) IN ({in_clause})
+    """
+    params = [item for t in tuples for item in t]
+
+    if callsign:
+        sql += " AND callsign = %s"
+        params.append(callsign)
+
+    sql += " ORDER BY request_id DESC"
+    live_rows = db.query(sql, tuple(params))
+    return {"count": len(live_rows), "data": live_rows}
+
+# Light / current
+
+@router.get("/live/current/light")
+def get_live_current_light(callsign: Optional[str] = Query(None)):
+    current_rows = get_current_subset()
+    if not current_rows:
+        return {"count": 0, "data": []}
+
+    tuples = [(r["unique_key"], r["callsign"], r["icao24"]) for r in current_rows]
+    in_clause = ",".join(["(%s,%s,%s)"] * len(tuples))
+    sql = f"""
+        SELECT request_id, callsign, icao24, longitude, latitude, global_condition, unique_key
+        FROM live_data
+        WHERE (unique_key, callsign, icao24) IN ({in_clause})
+    """
+    params = [item for t in tuples for item in t]
+
+    if callsign:
+        sql += " AND callsign = %s"
+        params.append(callsign)
+
+    sql += " ORDER BY request_id DESC"
+    live_rows = db.query(sql, tuple(params))
+    return {"count": len(live_rows), "data": live_rows}

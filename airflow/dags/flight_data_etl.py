@@ -26,11 +26,11 @@ default_args = {
 }
 
 @dag(
-	dag_id="flight_data_etl",
-	default_args=default_args,
-	schedule="*/5 * * * *",
-	catchup=False,
-	tags=["airlines", "etl", "production"]
+	dag_id = "flight_data_etl",
+	default_args = default_args,
+	schedule = "*/5 * * * *",
+	catchup = False,
+	tags = ["airlines", "etl",]
 )
 def flight_data_pipeline():
 
