@@ -7,14 +7,11 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from airflow.models import Variable
-
 
 class MLClient:
 	def __init__(self):
-		self.api_url = Variable.get("API_URL", default_var = "http://api:8000")
-		self.mlflow_uri = Variable.get("MLFLOW_TRACKING_URI", default_var = "http://mlflow:5000")
-
+		self.api_url = "http://api:8000"
+		self.mlflow_uri = "http://mlflow:5000"
 		mlflow.set_tracking_uri(self.mlflow_uri)
 		mlflow.set_experiment("Model_Test")
 

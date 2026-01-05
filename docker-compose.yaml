@@ -36,6 +36,7 @@ x-airflow-common:
     - ./airflow/dags:/opt/airflow/dags
     - ./airflow/config:/opt/airflow/config
     - ./airflow/plugins:/opt/airflow/plugins
+    - mlflow_artifacts:/mlflow/artifacts
   networks:
     - airflow_network
   user: "1000:0"
@@ -194,6 +195,9 @@ services:
     command:
       - -c
       - |
+        mkdir -p /mlflow/artifacts
+        chown -R "1000:0" /mlflow/artifacts
+        chmod -R 775 /mlflow/artifacts
         mkdir -p /opt/airflow/{dags,plugins,config,logs}
         /entrypoint airflow config list >/dev/null
         chown -R "1000:0" /opt/airflow/
