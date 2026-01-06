@@ -1,12 +1,14 @@
 import requests
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 import mlflow
 import mlflow.sklearn
-
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
+import os
 
 class MLClient:
 	def __init__(self):
@@ -42,12 +44,11 @@ class MLClient:
 		return df_features
 
 	def train_and_log_model(self, data: pd.DataFrame):
-
 		TARGET = "arrival_difference"
 		n_estimators = 100
 		max_depth = 10
 
-		X = data.drop(columns = [TARGET])
+		X = data.drop(columns=[TARGET])
 		y = data[TARGET]
 
 		categorical_cols = ["callsign", "icao24", "global_condition"]
@@ -55,26 +56,61 @@ class MLClient:
 			le = LabelEncoder()
 			X[col] = le.fit_transform(X[col].astype(str))
 
-		X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 42)
+		X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 		with mlflow.start_run(run_name="Run_Model_Test"):
-
-			model = RandomForestRegressor(n_estimators = n_estimators, max_depth = max_depth, random_state = 42)
-
-			mlflow.log_param("model_type", "RandomForestRegressor")
-			mlflow.log_param("n_estimators", n_estimators)
-			mlflow.log_param("max_depth", max_depth)
-			mlflow.log_param("features", X_train.columns.to_list())
+			model = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, random_state=42)
+			
+			# Log des paramètres
+			mlflow.log_params({
+				"model_type": "RandomForestRegressor",
+				"n_estimators": n_estimators,
+				"max_depth": max_depth,
+				"features_count": len(X.columns)
+			})
 
 			model.fit(X_train, y_train)
-
 			y_pred = model.predict(X_test)
-			mae = mean_absolute_error(y_test, y_pred)
-			mlflow.log_metric("MAE", mae)
 
-			mlflow.sklearn.log_model(sk_model = model, name = "arrival_delay_model", registered_model_name = "ArrivalDelayModel")
+			# --- CALCUL DES MÉTRIQUES ---
+			mae = mean_absolute_error(y_test, y_pred)
+			rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+			r2 = r2_score(y_test, y_pred)
+
+			mlflow.log_metrics({
+				"MAE": mae,
+				"RMSE": rmse,
+				"R2_Score": r2
+			})
+
+			# --- ANALYSE DE L'IMPORTANCE DES VARIABLES ---
+			# Création du graphique
+			importances = model.feature_importances_
+			indices = np.argsort(importances)
+			
+			plt.figure(figsize=(10, 8))
+			plt.title("Importance des Variables (Feature Importance)")
+			plt.barh(range(len(indices)), importances[indices], align="center", color='skyblue')
+			plt.yticks(range(len(indices)), [X.columns[i] for i in indices])
+			plt.xlabel("Importance Relative")
+			plt.tight_layout()
+			
+			# Sauvegarde et log dans MLflow
+			plot_path = "feature_importance.png"
+			plt.savefig(plot_path)
+			mlflow.log_artifact(plot_path)
+			plt.close() # Libère la mémoire
+
+			# Log du modèle
+			mlflow.sklearn.log_model(
+				sk_model=model, 
+				artifact_path="arrival_delay_model", 
+				registered_model_name="ArrivalDelayModel"
+			)
 
 			return {
 				"mae": float(mae),
+				"rmse": float(rmse),
+				"r2": float(r2),
 				"rows": int(len(data)),
 			}
