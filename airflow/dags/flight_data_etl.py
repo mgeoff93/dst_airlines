@@ -12,17 +12,16 @@ from postgres_client import PostgresClient
 from selenium_client import SeleniumClient
 
 logging.basicConfig(
-	format="[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s",
-	datefmt="%Y-%m-%dT%H:%M:%S",
-	level=logging.INFO
+	format = "[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s",
+	datefmt = "%Y-%m-%dT%H:%M:%S",
+	level = logging.INFO
 )
 
-# --- Default DAG args ---
 default_args = {
 	"owner": "DST Airlines",
-	"start_date": datetime(2025, 12, 29),  # date fixe
+	"start_date": datetime(2025, 12, 29),
 	"retries": 2,
-	"retry_delay": timedelta(seconds=30),
+	"retry_delay": timedelta(seconds = 30),
 }
 
 @dag(

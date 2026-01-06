@@ -44,6 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_dynamic_arrival ON flight_dynamic(arrival_schedul
 CREATE INDEX IF NOT EXISTS idx_dynamic_callsign_update ON flight_dynamic(callsign, last_update DESC);
 
 CREATE TABLE IF NOT EXISTS live_data (
+    indice SERIAL,
     request_id UUID NOT NULL,
     callsign VARCHAR(10) NOT NULL,
     icao24 VARCHAR(10) NOT NULL,
@@ -69,6 +70,7 @@ CREATE TABLE IF NOT EXISTS live_data (
         REFERENCES flight_dynamic(unique_key)
 );
 
+CREATE INDEX IF NOT EXISTS idx_live_indice ON live_data(indice DESC);
 CREATE INDEX IF NOT EXISTS idx_live_callsign ON live_data(callsign);
 CREATE INDEX IF NOT EXISTS idx_live_icao24 ON live_data(icao24);
 CREATE INDEX IF NOT EXISTS idx_live_unique_key ON live_data(unique_key);
