@@ -1,6 +1,4 @@
 -- 1. Création des bases de données (si elles n'existent pas)
--- Note : Dans un script d'init Docker, si une erreur survient ici, 
--- le reste du script s'arrête.
 CREATE DATABASE mlflow;
 CREATE DATABASE airlines;
 
@@ -13,10 +11,6 @@ CREATE TABLE IF NOT EXISTS flight_static (
     airline_name VARCHAR(100),
     origin_code VARCHAR(3),
     destination_code VARCHAR(3),
-    origin_airport VARCHAR(100),
-    destination_airport VARCHAR(100),
-    origin_city VARCHAR(100),
-    destination_city VARCHAR(100),
     commercial_flight BOOLEAN
 );
 
@@ -32,8 +26,8 @@ CREATE TABLE IF NOT EXISTS flight_dynamic (
     departure_actual TIME,
     arrival_scheduled TIME,
     arrival_actual TIME,
-    status VARCHAR(10) NOT NULL,
-    last_update TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    status VARCHAR(15) NOT NULL, -- Augmenté de 10 à 15 pour supporter "just landed"
+    last_update TIMESTAMPTZ DEFAULT NOW(), -- Changé en TIMESTAMPTZ pour la précision du delta 20min
     unique_key TEXT NOT NULL,
     CONSTRAINT pk_flight_dynamic PRIMARY KEY (unique_key)
 );
@@ -41,6 +35,7 @@ CREATE TABLE IF NOT EXISTS flight_dynamic (
 CREATE INDEX IF NOT EXISTS idx_dynamic_callsign ON flight_dynamic(callsign);
 CREATE INDEX IF NOT EXISTS idx_dynamic_departure ON flight_dynamic(departure_scheduled);
 CREATE INDEX IF NOT EXISTS idx_dynamic_arrival ON flight_dynamic(arrival_scheduled);
+-- Cet index est crucial pour la rapidité de la méthode needs_refresh
 CREATE INDEX IF NOT EXISTS idx_dynamic_callsign_update ON flight_dynamic(callsign, last_update DESC);
 
 CREATE TABLE IF NOT EXISTS live_data (
