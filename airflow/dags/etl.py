@@ -21,14 +21,14 @@ logging.basicConfig(
 default_args = {
 	"owner": "DST Airlines",
 	"start_date": datetime(2025, 12, 29),
-	"retries": 1, # Réduit pour tenir dans les 5 minutes
+	"retries": 1,
 	"retry_delay": timedelta(seconds = 30),
 }
 
 @dag(
 	dag_id = "etl",
 	default_args = default_args,
-	schedule = None,
+	schedule = "*/7 * * * *",
 	catchup = False,
 	tags = ["airlines", "etl"]
 )
