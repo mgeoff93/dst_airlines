@@ -29,30 +29,38 @@ class PostgresClient:
 		result = self.hook.get_first(sql = query, parameters = (callsign,))
 		return result is not None
 
-	def needs_refresh(self, callsign, icao24, opensky_on_ground):
-		# 1. Garde-fou : si inconnu ou donnée incomplète (Unknown) -> OUI
-		static = self.get_static_flight(callsign)
-		if not static or static.get("airline_name") == "Unknown Airline":
+	def needs_refresh(self, callsign, icao24, opensky_on_ground, static = None, dynamic = None):
+		"""
+		Détermine si un vol a besoin d'un nouveau passage Selenium.
+		On passe static et dynamic en paramètres pour éviter les doubles appels SQL.
+		"""
+		# 1. Si inconnu ou donnée incomplète (Unknown) -> OUI
+		if not static or static.get("airline_name") == "Unknown Airline" or not static.get("origin_code"):
 			return True
 
-		# 2. Récupérer le dernier état dynamique
-		dynamic = self.get_latest_dynamic_flight(callsign, icao24)
+		# 2. Si aucun historique dynamique -> OUI (besoin de la unique_key)
 		if not dynamic:
 			return True
 		
+		# 3. Si déjà arrivé -> NON (on ne scrape plus un vol fini)
 		if dynamic["status"] == "arrived":
 			return False
 
+		# 4. Si OpenSky voit l'avion au sol alors qu'on le pensait en route -> OUI (MAJ statut)
 		if opensky_on_ground and dynamic["status"] == "en route":
 			return True
 
-		# Rafraîchir toutes les 20 min pour le live
+		# 5. Rafraîchir toutes les 20 min pour le live
 		last_update = dynamic["last_update"]
 		if isinstance(last_update, str):
 			last_update = datetime.fromisoformat(last_update)
 		
+		# S'assurer du timezone pour la comparaison
+		if last_update.tzinfo is None:
+			last_update = last_update.replace(tzinfo=timezone.utc)
+			
 		now = datetime.now(timezone.utc)
-		if now - last_update > timedelta(minutes = 20):
+		if now - last_update > timedelta(minutes=20):
 			return True
 
 		return False

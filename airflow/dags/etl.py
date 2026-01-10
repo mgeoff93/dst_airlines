@@ -20,7 +20,7 @@ logging.basicConfig(
 
 default_args = {
 	"owner": "DST Airlines",
-	"start_date": datetime(2025, 12, 29),
+	"start_date": datetime(2026, 1, 10),
 	"retries": 1,
 	"retry_delay": timedelta(seconds = 30),
 }
@@ -28,8 +28,9 @@ default_args = {
 @dag(
 	dag_id = "etl",
 	default_args = default_args,
-	schedule = "*/7 * * * *",
+	schedule = "*/5 * * * *",
 	catchup = False,
+	max_active_runs = 1,
 	tags = ["airlines", "etl"]
 )
 def flight_data_pipeline():
@@ -47,12 +48,16 @@ def flight_data_pipeline():
 		return flights
 
 	@task
-	def triage(flights: List[Dict]) -> List[Dict]:
+	def triage(flights: List[Dict]) -> Dict[str, List[Dict]]:
 		postgrescli = PostgresClient()
+		weathercli = WeatherClient() # Initialisation pour les vols directs
 		needs_scrape = []
+		direct_live = []
+	
 		try:
 			for f in flights:
 				current_static = postgrescli.get_static_flight(f["callsign"])
+				latest_dynamic = postgrescli.get_latest_dynamic_flight(f["callsign"], f["icao24"])
 	
 				# Condition de "complétude"
 				is_incomplete = False
@@ -63,13 +68,25 @@ def flight_data_pipeline():
 						current_static.get("destination_code")
 					])
 	
-				if not current_static or is_incomplete:
-					logging.info(f"Triage: {f['callsign']} incomplete or unknown. Scrape needed.")
+				# Décision
+				if not current_static or is_incomplete or postgrescli.needs_refresh(f["callsign"], f["icao24"], f["on_ground"]):
+					logging.info(f"Triage: {f['callsign']} needs scrape.")
 					needs_scrape.append(f)
-				elif postgrescli.needs_refresh(f["callsign"], f["icao24"], f["on_ground"]):
-					needs_scrape.append(f)
+				elif latest_dynamic:
+					# VOL DIRECT : On récupère la météo ici car on ne passe pas par scraping()
+					lat, lon = f.get("latitude"), f.get("longitude")
+					if lat and lon:
+						f.update(weathercli.get_weather(lat, lon))
 	
-			return needs_scrape
+					# Préparation de la ligne live avec la clé existante
+					f.update({
+						"departure_scheduled": latest_dynamic["departure_scheduled"].strftime("%H:%M:%S") if latest_dynamic["departure_scheduled"] else None,
+						"flight_date": latest_dynamic["flight_date"],
+						"unique_key": latest_dynamic["unique_key"]
+					})
+					direct_live.append(f)
+	
+			return {"scrape": needs_scrape, "direct": direct_live}
 		finally:
 			postgrescli.close()
 
@@ -119,15 +136,22 @@ def flight_data_pipeline():
 			postgrescli.close()
 
 	@task
-	def loading(results: List[Optional[Dict]]):
+	def loading(scrape_results: List[Optional[Dict]], direct_rows: List[Dict]):
 		postgrescli = PostgresClient()
 		try:
 			all_static, all_dynamic, all_live = [], [], []
-			for r in results:
+			
+			# 1. Données issues du scraping
+			for r in scrape_results:
 				if not r: continue
 				all_static.extend(r.get("static_rows", []))
 				all_dynamic.extend(r.get("dynamic_rows", []))
 				all_live.extend(r.get("live_rows", []))
+
+			# 2. Données directes (positions sans scrape)
+			if direct_rows:
+				# On peut ajouter la météo ici pour les direct_rows si nécessaire
+				all_live.extend(direct_rows)
 
 			if all_static: postgrescli.insert_flight_static(all_static)
 			if all_dynamic: postgrescli.insert_flight_dynamic(all_dynamic)
@@ -135,6 +159,26 @@ def flight_data_pipeline():
 		finally:
 			postgrescli.close()
 
-	loading(scraping.expand(flight = triage(requesting())))
+	# --- Orchestration ---
+	triage_results = triage(requesting())
+
+	# On crée deux petites tâches "helper" pour extraire les listes
+	@task
+	def get_scrape_list(res): return res["scrape"]
+	
+	@task
+	def get_direct_list(res): return res["direct"]
+
+	# On extrait les listes via ces tâches
+	list_to_scrape = get_scrape_list(triage_results)
+	list_direct = get_direct_list(triage_results)
+
+	# Maintenant le mapping fonctionne car list_to_scrape est le résultat direct d'une tâche
+	scraped_data = scraping.expand(flight = list_to_scrape)
+	
+	loading(
+		scrape_results = scraped_data, 
+		direct_rows = list_direct
+	)
 
 flight_data_pipeline()

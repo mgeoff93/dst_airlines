@@ -22,11 +22,11 @@ class SeleniumClient:
 			"--headless=new", 
 			"--disable-gpu", 
 			"--no-sandbox",
-			"--disable-dev-shm-usage", 
 			"--disable-extensions",
 			"--blink-settings=imagesEnabled=false", # Désactive le moteur de rendu des images
 			"--lang=en-US",
-			"log-level=3"
+			"log-level=3",
+			"--disable-blink-features=AutomationControlled"
 		]
 		for arg in arguments:
 			options.add_argument(arg)

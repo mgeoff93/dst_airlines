@@ -30,7 +30,6 @@ x-airflow-common:
     AIRFLOW__LOGGING__TASK_LOGGER: 'airflow.utils.log.task_handler.DbTaskHandler'
     AIRFLOW__LOGGING__HANDLER: 'airflow.utils.log.task_handler.DbTaskHandler'
     PYTHONPATH: "${AIRFLOW_PROJ_DIR:-.}/plugins"
-    # Configuration MLflow pour que les DAGs sachent où envoyer les données
     MLFLOW_TRACKING_URI: http://mlflow:5000
   volumes:
     - ./airflow/dags:/opt/airflow/dags
@@ -87,7 +86,12 @@ services:
     container_name: selenium
     ports:
       - "4444:4444"
+    # TRÈS IMPORTANT : Augmenté à 2gb pour supporter les 4 slots simultanés sans crash Chrome
     shm_size: 2gb
+    deploy:
+      resources:
+        limits:
+          memory: 2G
     restart: always
     networks:
       - airflow_network
@@ -164,6 +168,10 @@ services:
   airflow-worker:
     <<: *airflow-common
     command: celery worker
+    environment:
+      <<: *airflow-common-env
+      # Limite le nombre de tâches parallèles sur le worker pour éviter la surcharge
+      AIRFLOW__CELERY__WORKER_CONCURRENCY: 8
     networks:
       - airflow_network
     restart: always
@@ -203,7 +211,8 @@ services:
         chown -R "1000:0" /opt/airflow/
         airflow connections import /opt/airflow/config/connections.yaml
         airflow variables import /opt/airflow/config/variables.json
-        airflow pools set selenium_pool 2 "Pool pour limiter les sessions Selenium"
+        # Définit le pool à 4 pour matcher les ressources allouées à Selenium
+        airflow pools set selenium_pool 4 "Pool pour limiter les sessions Selenium"
     environment:
       <<: *airflow-common-env
       _AIRFLOW_DB_MIGRATE: 'true'
