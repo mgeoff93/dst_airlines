@@ -12,7 +12,7 @@ class PostgresClient:
 		self.cur = self.conn.cursor()
 
 	def get_static_flight(self, callsign: str) -> Optional[Dict]:
-		"""Récupère les infos statiques pour le triage (Garde-fou)."""
+		"""Récupère les infos statiques pour le triage."""
 		query = "SELECT callsign, airline_name, origin_code, destination_code FROM flight_static WHERE callsign = %s"
 		result = self.hook.get_first(sql=query, parameters=(callsign,))
 		if result:
@@ -24,48 +24,36 @@ class PostgresClient:
 			}
 		return None
 
-	def is_static_known(self, callsign):
+	def is_static_known(self, callsign: str) -> bool:
 		query = "SELECT 1 FROM flight_static WHERE callsign = %s LIMIT 1;"
-		result = self.hook.get_first(sql = query, parameters = (callsign,))
+		result = self.hook.get_first(sql=query, parameters=(callsign,))
 		return result is not None
 
-	def needs_refresh(self, callsign, icao24, opensky_on_ground, static = None, dynamic = None):
+	def needs_refresh(self, callsign: str, icao24: str, on_ground: bool, threshold_minutes: int = 60) -> bool:
 		"""
-		Détermine si un vol a besoin d'un nouveau passage Selenium.
-		On passe static et dynamic en paramètres pour éviter les doubles appels SQL.
+		Détermine si un vol a besoin d'un nouveau scraping.
+		Utilise datetime.now(timezone.utc) pour éviter les décalages Naive/Aware.
 		"""
-		# 1. Si inconnu ou donnée incomplète (Unknown) -> OUI
-		if not static or static.get("airline_name") == "Unknown Airline" or not static.get("origin_code"):
-			return True
-
-		# 2. Si aucun historique dynamique -> OUI (besoin de la unique_key)
+		dynamic = self.get_latest_dynamic_flight(callsign, icao24)
 		if not dynamic:
 			return True
-		
-		# 3. Si déjà arrivé -> NON (on ne scrape plus un vol fini)
-		if dynamic["status"] == "arrived":
-			return False
 
-		# 4. Si OpenSky voit l'avion au sol alors qu'on le pensait en route -> OUI (MAJ statut)
-		if opensky_on_ground and dynamic["status"] == "en route":
-			return True
-
-		# 5. Rafraîchir toutes les 20 min pour le live
-		last_update = dynamic["last_update"]
-		if isinstance(last_update, str):
-			last_update = datetime.fromisoformat(last_update)
-		
-		# S'assurer du timezone pour la comparaison
-		if last_update.tzinfo is None:
-			last_update = last_update.replace(tzinfo=timezone.utc)
-			
+		# Heure actuelle avec fuseau UTC
 		now = datetime.now(timezone.utc)
-		if now - last_update > timedelta(minutes=20):
-			return True
+		
+		# S'assurer que last_update est bien "conscient" du fuseau UTC
+		last_upd = dynamic["last_update"]
+		if last_upd.tzinfo is None:
+			last_upd = last_upd.replace(tzinfo=timezone.utc)
 
-		return False
+		diff_minutes = (now - last_upd).total_seconds() / 60
+		
+		logging.info(f"DEBUG REFRESH: {callsign} | Last update: {diff_minutes:.1f} min ago | Threshold: {threshold_minutes} min")
+		
+		return diff_minutes > threshold_minutes
 
-	def get_latest_dynamic_flight(self, callsign, icao24):
+	def get_latest_dynamic_flight(self, callsign: str, icao24: str) -> Optional[Dict]:
+		"""Récupère la dernière entrée dynamique et gère le statut des vols expirés."""
 		query = """
 			SELECT icao24, callsign, flight_date, departure_scheduled, departure_actual, 
 				   arrival_scheduled, arrival_actual, status, last_update, unique_key
@@ -74,8 +62,9 @@ class PostgresClient:
 			ORDER BY flight_date DESC, departure_scheduled DESC
 			LIMIT 1;
 		"""
-		result = self.hook.get_first(sql = query, parameters = (callsign, icao24))
-		if result is None: return None
+		result = self.hook.get_first(sql=query, parameters=(callsign, icao24))
+		if result is None: 
+			return None
 
 		columns = [
 			"icao24", "callsign", "flight_date", "departure_scheduled", "departure_actual",
@@ -83,19 +72,23 @@ class PostgresClient:
 		]
 		dynamic = dict(zip(columns, result))
 
-		if dynamic["status"] in ("en route", "departing"):
-			last_update = dynamic["last_update"]
-			if last_update.tzinfo is None:
-				last_update = last_update.replace(tzinfo=timezone.utc)
+		# Correction : On s'assure que last_update est aware pour la comparaison de statut
+		last_update = dynamic["last_update"]
+		if last_update.tzinfo is None:
+			last_update = last_update.replace(tzinfo=timezone.utc)
 
+		# Si le vol est marqué en cours mais n'a pas bougé depuis 90 min (marge augmentée), on le clôture
+		if dynamic["status"] in ("en route", "departing"):
 			now = datetime.now(timezone.utc)
-			if now - last_update > timedelta(minutes = 45):
+			if (now - last_update) > timedelta(minutes=90):
 				update_sql = "UPDATE flight_dynamic SET status = 'arrived' WHERE unique_key = %s"
-				self.hook.run(update_sql, parameters = (dynamic["unique_key"],))
+				self.hook.run(update_sql, parameters=(dynamic["unique_key"],))
 				dynamic["status"] = "arrived"
+				logging.info(f"Auto-closing flight {callsign} (Timeout)")
+				
 		return dynamic
 
-	def insert_flight_static(self, rows):
+	def insert_flight_static(self, rows: List[Dict]):
 		if not rows: return
 		query = """
 			INSERT INTO flight_static (callsign, airline_name, origin_code, destination_code, commercial_flight)
@@ -108,12 +101,12 @@ class PostgresClient:
 		for row in rows:
 			try:
 				self.cur.execute(query, row)
+				self.conn.commit() # Commit individuel pour éviter de perdre tout le batch en cas d'erreur
 			except Exception as e:
 				self.conn.rollback()
-				logging.error(f"Static insert failed: {e}")
-		self.conn.commit()
+				logging.error(f"Static insert failed for {row.get('callsign')}: {e}")
 
-	def insert_flight_dynamic(self, rows):
+	def insert_flight_dynamic(self, rows: List[Dict]):
 		if not rows: return
 		query = """
 			INSERT INTO flight_dynamic (callsign, icao24, flight_date, departure_scheduled, departure_actual,
@@ -127,15 +120,16 @@ class PostgresClient:
 				last_update = NOW();
 		"""
 		for row in rows:
-			if not all([row.get("flight_date"), row.get("departure_scheduled"), row.get("unique_key")]): continue
+			if not all([row.get("flight_date"), row.get("departure_scheduled"), row.get("unique_key")]): 
+				continue
 			try:
 				self.cur.execute(query, row)
+				self.conn.commit()
 			except Exception as e:
 				self.conn.rollback()
-				logging.error(f"Dynamic upsert failed: {e}")
-		self.conn.commit()
+				logging.error(f"Dynamic upsert failed for {row.get('unique_key')}: {e}")
 
-	def insert_live_data(self, rows):
+	def insert_live_data(self, rows: List[Dict]):
 		if not rows: return
 		query = """
 			INSERT INTO live_data (request_id, callsign, icao24, flight_date, departure_scheduled,
@@ -148,16 +142,20 @@ class PostgresClient:
 					%(visibility)s, %(cloud_coverage)s, %(rain)s, %(global_condition)s, %(unique_key)s)
 		"""
 		for row in rows:
-			if not all([row.get("flight_date"), row.get("departure_scheduled"), row.get("unique_key")]): continue
+			# Sécurité : On s'assure que les clés de jointure sont présentes
+			if not all([row.get("flight_date"), row.get("departure_scheduled"), row.get("unique_key")]):
+				logging.warning(f"Live data skipped for {row.get('callsign')}: Missing keys")
+				continue
 			try:
 				self.cur.execute(query, row)
+				self.conn.commit()
 			except Exception as e:
 				self.conn.rollback()
-				logging.error(f"Live insert failed: {e}")
-		self.conn.commit()
+				logging.error(f"Live insert failed for {row.get('callsign')}: {e}")
 
 	def close(self):
 		try:
 			self.cur.close()
 			self.conn.close()
-		except: pass
+		except: 
+			pass

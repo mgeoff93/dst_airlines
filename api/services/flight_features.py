@@ -22,13 +22,6 @@ def dataframe_to_list_of_dicts(df: pd.DataFrame) -> list:
 	return df.replace({np.nan: None}).where(pd.notna(df), None).to_dict(orient="records")
 
 def build_flight_datasets(all_flights: pd.DataFrame) -> dict:
-	"""
-	Prétraite flight_dynamic pour produire :
-	- normalized : toutes les lignes
-	- done : vols arrivés
-	- current : vols en cours
-	"""
-
 	df = all_flights.copy()
 
 	# --- timestamps départ ---
@@ -86,24 +79,33 @@ def build_flight_datasets(all_flights: pd.DataFrame) -> dict:
 	# Changement critique : On évite pd.NA qui casse le JSON
 	normalized = normalized.where(pd.notna(normalized), None)
 
-	# --- datasets métier ---
+# --- datasets métier ---
+	normalized = normalized.where(pd.notna(normalized), None)
+
 	done = normalized[
-		(normalized["status"] == "arrived") &
-		normalized["arrival_status"].notna()
+			(normalized["status"] == "arrived") &
+			normalized["arrival_status"].notna()
 	].copy()
 
-	now = pd.Timestamp.utcnow().tz_localize(None)
+	# FIX : On s'assure que tout est en "naive" (sans TZ) pour la soustraction
+	now = pd.Timestamp.utcnow().replace(tzinfo=None) # Force naive
+		
+	# On force la colonne last_update en datetime naive au cas où
+	df["last_update"] = pd.to_datetime(df["last_update"]).dt.tz_localize(None)
 
 	current = normalized[
-		normalized["status"].isin(["departing", "en route"])
+			normalized["status"].isin(["departing", "en route"])
 	].copy()
 
+	# S'assurer que current["last_update"] est bien datetime pour le calcul
+	current["last_update"] = pd.to_datetime(current["last_update"]).dt.tz_localize(None)
+
 	current = current[
-		~(
-			current["arrival_actual_ts"].isna() &
-			(now > current["arrival_scheduled_ts"]) &
-			((now - current["last_update"]) > STALE_THRESHOLD)
-		)
+			~(
+					current["arrival_actual_ts"].isna() &
+					(now > current["arrival_scheduled_ts"].dt.tz_localize(None)) & # localize(None) ici aussi
+					((now - current["last_update"]) > STALE_THRESHOLD)
+			)
 	].copy()
 
 	return {
