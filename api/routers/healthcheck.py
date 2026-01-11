@@ -3,7 +3,7 @@ from api.core.database import db
 
 router = APIRouter(tags=["Healthcheck"])
 
-@router.get("/health")
+@router.get("/healthcheck")
 def health_check():
 	"""
 	Vérifie la connexion à la base PostgreSQL.
