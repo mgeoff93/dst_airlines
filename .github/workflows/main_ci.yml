@@ -31,8 +31,16 @@ jobs:
 
       - name: Run API Unit Tests
         run: |
-          export PYTHONPATH=$PYTHONPATH:$(pwd)
-          pytest api/tests/
+          # 1. Vérification physique de la présence du fichier
+          echo "Vérification du contenu du dossier api/tests :"
+          ls -R api/tests
+          
+          # 2. Ajout du répertoire courant au PATH Python
+          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+          
+          # 3. Lancement de pytest avec l'option -v (verbose) 
+          # et en forçant le dossier racine
+          python -m pytest -v api/tests/
 
       - name: Validate Docker Compose Configuration
         run: docker compose config -q
