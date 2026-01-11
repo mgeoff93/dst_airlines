@@ -2,19 +2,19 @@ terraform {
   required_providers {
     docker = {
       source  = "kreuzwerker/docker"
-      version = "~> 3.0.1"
+      version = "~> 3.0.2"
     }
   }
 }
 
 provider "docker" {
-  # Sur Windows, Terraform communique avec Docker Desktop via ce host par défaut
   host = "npipe:////./pipe/docker_engine"
 }
 
 # Création du réseau que tes services utilisent
 resource "docker_network" "airflow_network" {
   name = "airflow_network_terraform"
+  check_duplicate = true
 }
 
 # Création du volume pour la base de données
