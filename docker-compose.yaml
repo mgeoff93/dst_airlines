@@ -1,10 +1,15 @@
 networks:
   airflow_network:
-    driver: bridge
+    external: true
+    name: airflow_network_terraform
 
 volumes:
   postgres-db-volume:
+    external: true
+    name: postgres-db-volume-terraform
   mlflow_artifacts:
+    external: true
+    name: mlflow-artifacts-terraform
 
 x-airflow-common:
   &airflow-common
