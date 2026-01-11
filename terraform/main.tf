@@ -1,31 +1,28 @@
 terraform {
-  required_version = ">= 1.0.0"
   required_providers {
-    google = {
-      source  = "hashicorp/google"
-      version = "~> 4.0"
+    docker = {
+      source  = "kreuzwerker/docker"
+      version = "~> 3.0.1"
     }
   }
 }
 
-provider "google" {
-  project = "dst-airlines-project" # Remplace par ton ID projet réel
-  region  = "europe-west1"
+provider "docker" {
+  # Sur Windows, Terraform communique avec Docker Desktop via ce host par défaut
+  host = "npipe:////./pipe/docker_engine"
 }
 
-# Bucket pour stocker les modèles MLflow (Artéfacts)
-resource "google_storage_bucket" "mlflow_storage" {
-  name          = "dst-airlines-mlflow-artifacts"
-  location      = "EU"
-  force_destroy = true
+# Création du réseau que tes services utilisent
+resource "docker_network" "airflow_network" {
+  name = "airflow_network_terraform"
 }
 
-# Exemple de base de données Cloud SQL (PostgreSQL)
-resource "google_sql_database_instance" "main_db" {
-  name             = "dst-airlines-db"
-  database_version = "POSTGRES_15"
-  region           = "europe-west1"
-  settings {
-    tier = "db-f1-micro"
-  }
+# Création du volume pour la base de données
+resource "docker_volume" "postgres_data" {
+  name = "postgres-db-volume-terraform"
+}
+
+# Création du volume pour MLflow
+resource "docker_volume" "mlflow_artifacts" {
+  name = "mlflow-artifacts-terraform"
 }
