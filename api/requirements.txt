@@ -3,3 +3,4 @@ uvicorn[standard]==0.24.0
 pandas==2.1.1
 numpy==1.26.4
 psycopg2-binary==2.9.9
+prometheus-fastapi-instrumentator==6.1.0
