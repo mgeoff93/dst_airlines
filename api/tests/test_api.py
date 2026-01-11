@@ -5,17 +5,16 @@ from api.main import app
 client = TestClient(app)
 
 def test_healthcheck():
-	"""Vérifie que l'API et ses routes de base répondent"""
+	"""Vérifie que l'API est saine et la DB connectée"""
 	response = client.get("/healthcheck")
 	assert response.status_code == 200
+	assert response.json() == {"status": "healthy", "database": "connected"}
 
 def test_prometheus_metrics():
-	"""Vérifie que l'instrumentation Prometheus est active"""
-	response = client.get("/metrics")
-	assert response.status_code == 200
-	assert "http_requests_total" in response.text
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    assert "http_request_duration_seconds" in response.text
 
 def test_api_docs_access():
-	"""Vérifie que la documentation Swagger est générée"""
 	response = client.get("/docs")
 	assert response.status_code == 200

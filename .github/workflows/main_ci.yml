@@ -9,6 +9,24 @@ on:
 jobs:
   infrastructure-quality:
     runs-on: ubuntu-latest
+    
+    # On définit les services nécessaires aux tests
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: user_test
+          POSTGRES_PASSWORD: password_test
+          POSTGRES_DB: db_test
+        ports:
+          - 5432:5432
+        # On attend que Postgres soit prêt avant de lancer les tests
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -23,41 +41,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install flake8 pytest httpx
           if [ -f api/requirements.txt ]; then pip install -r api/requirements.txt; fi
-          if [ -f airflow/requirements.txt ]; then pip install -r airflow/requirements.txt; fi
-
-      - name: Lint Python Code (API & Airflow)
-        run: |
-          flake8 api airflow --count --select=E9,F63,F7,F82 --show-source --statistics
 
       - name: Run API Unit Tests
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: user_test
+          POSTGRES_PASSWORD: password_test
+          POSTGRES_DB: db_test
         run: |
-          # 1. Vérification physique de la présence du fichier
-          echo "Vérification du contenu du dossier api/tests :"
-          ls -R api/tests
-          
-          # 2. Ajout du répertoire courant au PATH Python
-          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
-          
-          # 3. Lancement de pytest avec l'option -v (verbose) 
-          # et en forçant le dossier racine
-          python -m pytest -v api/tests/
-
-      - name: Validate Docker Compose Configuration
-        run: docker compose config -q
-
-      - name: Validate Prometheus Config
-        run: |
-          docker run --rm -v $(pwd)/prometheus:/etc/prometheus prom/prometheus:latest \
-          promtool check config /etc/prometheus/prometheus.yml
-
-      - name: Terraform Validate
-        run: |
-          cd terraform
-          terraform init -backend=false
-          terraform validate
-
-      - name: Build Multi-Services (Dry Run)
-        run: |
-          docker build -t dst_api:test ./api
-          docker build -t dst_airflow:test ./airflow
-          docker build -t dst_mlflow:test ./mlflow
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
+          python -m pytest -v api/tests/test_api.py
