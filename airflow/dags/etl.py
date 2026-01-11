@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 
 from airflow.decorators import dag, task
+from airflow.exceptions import AirflowFailException
 
 from opensky_client import OpenskyClient
 from weather_client import WeatherClient
@@ -28,7 +29,7 @@ default_args = {
 @dag(
 	dag_id = "etl",
 	default_args = default_args,
-	schedule = "@continuous",
+	schedule = None, #"*/5 * * * *",
 	catchup = False,
 	max_active_runs = 1,
 	tags = ["airlines", "etl"]
@@ -40,15 +41,27 @@ def flight_data_pipeline():
 		logging.info("=== EXTRACT: OpenSky API ===")
 		openskycli = OpenskyClient()
 		raw = openskycli.get_rawdata()
-		if not raw: return []
+	
+		# Si le quota est dépassé (None), on stoppe tout de suite proprement
+		if raw is None: 
+			raise AirflowFailException("OpenSky quota exceeded. Stopping DAG run.")
+	
 		flights = openskycli.normalize_rawdata(raw, filter=airline_filter)
-		if not flights: return []
+	
+		if not flights: 
+			logging.info("No flights matching the filter found.")
+			return []
+	
 		request_id = str(uuid4())
 		for f in flights: f["request_id"] = request_id
 		return flights
 
 	@task
 	def triage(flights: List[Dict]) -> Dict[str, List[Dict]]:
+		if not flights:
+			logging.info("Triage received an empty flight list.")
+			return {"scrape": [], "direct": []}
+
 		postgrescli = PostgresClient()
 		weathercli = WeatherClient() # Initialisation pour les vols directs
 		needs_scrape = []

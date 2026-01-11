@@ -29,7 +29,7 @@ class PostgresClient:
 		result = self.hook.get_first(sql=query, parameters=(callsign,))
 		return result is not None
 
-	def needs_refresh(self, callsign: str, icao24: str, on_ground: bool, threshold_minutes: int = 60) -> bool:
+	def needs_refresh(self, callsign: str, icao24: str, on_ground: bool, threshold_minutes: int = 10) -> bool:
 		"""
 		Détermine si un vol a besoin d'un nouveau scraping.
 		Utilise datetime.now(timezone.utc) pour éviter les décalages Naive/Aware.
