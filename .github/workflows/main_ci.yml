@@ -2,9 +2,9 @@ name: CI DST Airlines
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, refactoring ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, refactoring ]
 
 jobs:
   test-and-build:
