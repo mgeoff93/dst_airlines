@@ -14,7 +14,7 @@ provider "docker" {
 # 1. GÉNÉRATION DU FICHIER VARIABLES.JSON POUR AIRFLOW
 resource "local_file" "airflow_variables" {
   filename = "${path.module}/../airflow/config/variables.json"
-  content  = jsonencode({
+  content = jsonencode({
     "OPENSKY_USERNAME"     = var.OPENSKY_USERNAME
     "OPENSKY_PASSWORD"     = var.OPENSKY_PASSWORD
     "OPENSKY_TOKEN_URL"    = var.OPENSKY_TOKEN_URL
