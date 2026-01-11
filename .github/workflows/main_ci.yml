@@ -1,4 +1,4 @@
-name: CI DST Airlines - Full Infra
+name: CI DST Airlines - Full Infrastructure
 
 on:
   push:
@@ -7,12 +7,12 @@ on:
     branches: [ main, master, refactoring ]
 
 jobs:
-  # JOB 1 : Tests Python et Base de données
+  # JOB 1 : Tests API (Python + Postgres)
   api-tests:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:15
+        image: postgres:13 # Aligné avec ton docker-compose
         env:
           POSTGRES_USER: user_test
           POSTGRES_PASSWORD: password_test
@@ -46,7 +46,7 @@ jobs:
           export PYTHONPATH=$PYTHONPATH:$(pwd)
           python -m pytest -v api/tests/test_api.py
 
-  # JOB 2 : Validation Terraform (Apparaîtra à côté du premier)
+  # JOB 2 : Validation Terraform (Adapté aux variables manquantes)
   terraform-quality:
     runs-on: ubuntu-latest
     steps:
@@ -58,6 +58,13 @@ jobs:
       - name: Terraform Init
         run: terraform init
         working-directory: ./terraform
+      
+      # On utilise -var-file avec un exemple ou on ignore la validation stricte des valeurs
       - name: Terraform Validate
         run: terraform validate
+        working-directory: ./terraform
+
+      # Optionnel : Vérifie si le code est bien formaté
+      - name: Terraform Format Check
+        run: terraform fmt -check
         working-directory: ./terraform

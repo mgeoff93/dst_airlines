@@ -2,9 +2,10 @@ from fastapi import APIRouter, HTTPException
 from api.core.database import db
 from api.services import flight_features
 import pandas as pd
+from api.metrics import API_RESPONSE_TIME
+import time
 
 router = APIRouter(tags=["Merged metadatas"])
-
 
 def get_datasets():
 	sql = "SELECT * FROM flight_dynamic ORDER BY last_update DESC"
@@ -36,13 +37,7 @@ def get_live_rows(callsign: str, unique_key: str):
 
 @router.get("/merged/{callsign}")
 def get_merged_flight(callsign: str):
-	"""
-	Retourne toutes les informations fusionnées pour un callsign :
-	- static (obligatoire)
-	- history (datasets["done"])
-	- live (datasets["current"])
-	"""
-
+	start_time = time.time()
 	# --- STATIC ---
 	static_data = get_static_flight(callsign)
 	if not static_data:
@@ -98,6 +93,8 @@ def get_merged_flight(callsign: str):
 			"last_update": flight.get("last_update"),
 			"live_data": live_rows
 		})
+
+	API_RESPONSE_TIME.observe(time.time() - start_time)
 
 	# --- RESPONSE ---
 	return {

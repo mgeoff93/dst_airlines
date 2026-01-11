@@ -1,3 +1,5 @@
+version: '3.8'
+
 networks:
   airflow_network:
     external: true
@@ -20,8 +22,9 @@ x-airflow-common:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
     AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
+    # Injection dynamique des identifiants DB
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
     AIRFLOW__CORE__FERNET_KEY: ''
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
@@ -31,9 +34,6 @@ x-airflow-common:
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
     AIRFLOW__LOGGING__REMOTE_LOGGING: 'false'
-    AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER: ''
-    AIRFLOW__LOGGING__TASK_LOGGER: 'airflow.utils.log.task_handler.DbTaskHandler'
-    AIRFLOW__LOGGING__HANDLER: 'airflow.utils.log.task_handler.DbTaskHandler'
     PYTHONPATH: "${AIRFLOW_PROJ_DIR:-.}/plugins"
     MLFLOW_TRACKING_URI: http://mlflow:5000
   volumes:
@@ -57,31 +57,25 @@ services:
   postgres:
     image: postgres:13
     environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
       - ./airflow/config/init_airlines.sql:/docker-entrypoint-initdb.d/init_airlines.sql
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "airflow"]
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}"]
       interval: 10s
       retries: 5
-      start_period: 5s
     networks:
       - airflow_network
     restart: always
 
   redis:
     image: redis:7.2-bookworm
-    expose:
-      - 6379
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
-      timeout: 30s
-      retries: 50
-      start_period: 30s
     networks:
       - airflow_network
     restart: always
@@ -89,118 +83,54 @@ services:
   selenium:
     image: selenium/standalone-chrome:latest
     container_name: selenium
-    ports:
-      - "4444:4444"
-    # TRÈS IMPORTANT : Augmenté à 2gb pour supporter les 4 slots simultanés sans crash Chrome
     shm_size: 2gb
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-    restart: always
     networks:
       - airflow_network
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:4444/wd/hub/status || exit 1"]
       interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+    restart: always
 
   mlflow:
-      build:
-        context: ./mlflow
-        dockerfile: Dockerfile
-      container_name: mlflow
-      ports:
-        - "5000:5000"
-      environment:
-        - MLFLOW_BACKEND_STORE_URI=postgresql+psycopg2://airflow:airflow@postgres:5432/mlflow
-        - MLFLOW_ARTIFACT_ROOT=/mlflow/artifacts
-      volumes:
-        - mlflow_artifacts:/mlflow/artifacts
-      networks:
-        - airflow_network
-      depends_on:
-        postgres:
-          condition: service_healthy
-      command: >
-        mlflow server
-        --backend-store-uri postgresql+psycopg2://airflow:airflow@postgres:5432/mlflow
-        --default-artifact-root /mlflow/artifacts
-        --host 0.0.0.0
-        --port 5000
-        --allowed-hosts "*"
-        --cors-allowed-origins "*"
-      restart: always
+    build:
+      context: ./mlflow
+      dockerfile: Dockerfile
+    container_name: mlflow
+    ports:
+      - "5000:5000"
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/mlflow
+      - MLFLOW_ARTIFACT_ROOT=/mlflow/artifacts
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
+    networks:
+      - airflow_network
+    command: >
+      mlflow server
+      --backend-store-uri postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/mlflow
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0
+    restart: always
 
   airflow-apiserver:
     <<: *airflow-common
     command: api-server
     ports:
       - "8080:8080"
-    networks:
-      - airflow_network
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/version"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
     restart: always
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-      selenium:
-        condition: service_healthy
 
   airflow-scheduler:
     <<: *airflow-common
     command: scheduler
-    networks:
-      - airflow_network
     restart: always
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-      selenium:
-        condition: service_healthy
 
   airflow-worker:
     <<: *airflow-common
     command: celery worker
     environment:
       <<: *airflow-common-env
-      # Limite le nombre de tâches parallèles sur le worker pour éviter la surcharge
       AIRFLOW__CELERY__WORKER_CONCURRENCY: 8
-    networks:
-      - airflow_network
     restart: always
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-      selenium:
-        condition: service_healthy
-
-  airflow-triggerer:
-    <<: *airflow-common
-    command: triggerer
-    networks:
-      - airflow_network
-    restart: always
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-      selenium:
-        condition: service_healthy
 
   airflow-init:
     <<: *airflow-common
@@ -208,23 +138,12 @@ services:
     command:
       - -c
       - |
-        mkdir -p /mlflow/artifacts
-        chown -R "1000:0" /mlflow/artifacts
-        chmod -R 775 /mlflow/artifacts
-        mkdir -p /opt/airflow/{dags,plugins,config,logs}
-        /entrypoint airflow config list >/dev/null
-        chown -R "1000:0" /opt/airflow/
-        airflow connections import /opt/airflow/config/connections.yaml
+        airflow db migrate
         airflow variables import /opt/airflow/config/variables.json
-        # Définit le pool à 4 pour matcher les ressources allouées à Selenium
         airflow pools set selenium_pool 4 "Pool pour limiter les sessions Selenium"
+        airflow users create --username ${POSTGRES_USER} --firstname Admin --lastname Admin --role Admin --email admin@example.com --password ${POSTGRES_PASSWORD}
     environment:
       <<: *airflow-common-env
-      _AIRFLOW_DB_MIGRATE: 'true'
-      _AIRFLOW_WWW_USER_CREATE: 'true'
-      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
-      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
-      _PIP_ADDITIONAL_REQUIREMENTS: ''
     user: "0:0"
 
   api:
@@ -237,29 +156,20 @@ services:
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_DB: airlines
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-    depends_on:
-      postgres:
-        condition: service_healthy
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     networks:
       - airflow_network
     restart: always
 
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.47.0
-    container_name: cadvisor
-    ports:
-      - "8081:8080"
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable"
     networks:
       - airflow_network
+    restart: always
 
   prometheus:
     image: prom/prometheus:latest
@@ -270,8 +180,6 @@ services:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     networks:
       - airflow_network
-    depends_on:
-      - api
 
   grafana:
     image: grafana/grafana:latest
@@ -280,5 +188,3 @@ services:
       - "3001:3000"
     networks:
       - airflow_network
-    depends_on:
-      - prometheus

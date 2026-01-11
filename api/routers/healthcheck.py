@@ -1,16 +1,15 @@
 from fastapi import APIRouter, HTTPException
 from api.core.database import db
+from api.metrics import DATABASE_STATUS
 
 router = APIRouter(tags=["Healthcheck"])
 
 @router.get("/healthcheck")
 def health_check():
-	"""
-	Vérifie la connexion à la base PostgreSQL.
-	Retourne 503 si la DB n'est pas joignable.
-	"""
-	try:
-		db.query("SELECT 1;")
-		return {"status": "healthy", "database": "connected"}
-	except Exception as e:
-		raise HTTPException(status_code=503, detail=str(e))
+    try:
+        db.query("SELECT 1;")
+        DATABASE_STATUS.set(1)
+        return {"status": "healthy", "database": "connected"}
+    except Exception as e:
+        DATABASE_STATUS.set(0)
+        raise HTTPException(status_code=503, detail=str(e))

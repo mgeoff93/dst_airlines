@@ -3,6 +3,7 @@ from typing import Optional
 from api.core.database import db
 from api.services import flight_features
 import pandas as pd
+from api.metrics import DB_RECORDS_PROCESSED
 
 router = APIRouter(tags=["Dynamic metadatas"])
 
@@ -20,7 +21,9 @@ def get_dynamic_flights(
 		raise HTTPException(status_code=400, detail="status must be 'live' or 'history'")
 
 	datasets = get_datasets()
-
+	total_loaded = len(datasets["current"]) + len(datasets["done"])
+	DB_RECORDS_PROCESSED.labels(table_name="flight_dynamic").inc(total_loaded)
+	
 	# --- sélection du dataset ---
 	if status == "live":
 		rows = datasets["current"]

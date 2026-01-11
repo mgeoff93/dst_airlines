@@ -1,3 +1,4 @@
+# --- Python & Environnements ---
 __pycache__/
 *.py[cod]
 *$py.class
@@ -10,17 +11,29 @@ venv/
 *.egg-info/
 dist/
 build/
-*.log
-.DS_Store
+
+# --- IDE (VS Code, PyCharm) ---
 .idea/
 .vscode/
-postgres-db-volume/
-*.ipynb_checkpoints
-mlruns/
-models/
-*.md
+.DS_Store
+
+# --- Terraform (Infrastructure) ---
 .terraform/
 *.tfstate
 *.tfstate.backup
 .terraform.lock.hcl
 terraform.exe
+
+# --- Secrets & Fichiers Générés ---
+.env
+terraform/terraform.tfvars
+airflow/config/variables.json
+
+# --- Data & ML Flow ---
+postgres-db-volume/
+*.ipynb_checkpoints
+mlruns/
+models/
+
+# --- Logs ---
+*.log
