@@ -30,7 +30,7 @@ resource "local_file" "airflow_variables" {
     "PUSHGATEWAY_URL"      = var.PUSHGATEWAY_URL
     "CONNECTION_ID"        = var.CONNECTION_ID
     "MLFLOW_API_URL"       = var.MLFLOW_API_URL
-    "AIRFLOW_API_URL"      = var.AIRFLOW_API_URL    
+    "AIRFLOW_API_URL"      = var.AIRFLOW_API_URL
   })
 }
 
