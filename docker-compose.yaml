@@ -23,12 +23,15 @@ x-airflow-common:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
     AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/airflow
-    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/airflow
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${AIRFLOW_POSTGRES_DB}
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${AIRFLOW_POSTGRES_DB}
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
-    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    # Correction Airflow 3 : Sécurité API et Connexions
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:-un_secret_de_32_caracteres_minimum_ici}
+    AIRFLOW__CORE__TEST_CONNECTION: 'Enabled'
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
@@ -39,6 +42,8 @@ x-airflow-common:
     AIRFLOW__LOGGING__HANDLER: 'airflow.utils.log.task_handler.DbTaskHandler'
     PYTHONPATH: "${AIRFLOW_PROJ_DIR:-.}/plugins"
     MLFLOW_TRACKING_URI: "${MLFLOW_API_URL}"
+    AIRFLOW_CONN_AIRLINES: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${AIRLINES_POSTGRES_DB}"
+    AIRFLOW__CORE__MIN_SERIALIZED_DAG_FETCH_INTERVAL: 10
   volumes:
     - ./airflow/dags:/opt/airflow/dags
     - ./airflow/config:/opt/airflow/config
@@ -63,7 +68,7 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: airflow
+      POSTGRES_DB: ${AIRFLOW_POSTGRES_DB}
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
       - ./airflow/config/init_airlines.sql:/docker-entrypoint-initdb.d/init_airlines.sql
@@ -122,11 +127,19 @@ services:
     command: api-server
     ports:
       - "8080:8080"
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
     restart: always
 
   airflow-scheduler:
     <<: *airflow-common
     command: scheduler
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
     restart: always
 
   airflow-worker:
@@ -135,6 +148,10 @@ services:
     environment:
       <<: *airflow-common-env
       AIRFLOW__CELERY__WORKER_CONCURRENCY: 8
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
     restart: always
 
   airflow-init:
@@ -150,16 +167,29 @@ services:
         mkdir -p /opt/airflow/{dags,plugins,config,logs,data}
         chown -R "50000:0" /opt/airflow/
 
-        airflow connections import /opt/airflow/config/connections.yaml
+        echo "Running airflow db migrate..."
+        airflow db migrate
+
+        # Creation de l'utilisateur admin (nécessaire si non présent)
+        airflow users create --username admin --firstname admin --lastname admin --role Admin --email admin@example.com --password admin || true
+
         airflow variables import /opt/airflow/config/variables.json
-        airflow pools set selenium_pool 4 "Pool pour limiter les sessions Selenium"
+        airflow pools set selenium_pool ${SELENIUM_POOL_SIZE} "Pool pour limiter les sessions Selenium"
+
+        airflow dags reserialize
     environment:
       <<: *airflow-common-env
       _AIRFLOW_DB_MIGRATE: 'true'
       _AIRFLOW_WWW_USER_CREATE: 'true'
       _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
       _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
+      SELENIUM_POOL_SIZE: ${SELENIUM_POOL_SIZE}
     user: "0:0"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
 
   api:
     build:
@@ -171,7 +201,7 @@ services:
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: ${POSTGRES_PORT}
-      POSTGRES_DB: ${POSTGRES_DB}
+      AIRLINES_POSTGRES_DB: ${AIRLINES_POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     networks:
@@ -181,12 +211,10 @@ services:
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter
     environment:
-      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable"
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${AIRLINES_POSTGRES_DB}?sslmode=disable"
     networks:
       - airflow_network
     restart: always
-
-  # --- MONITORING STACK ---
 
   pushgateway:
     image: prom/pushgateway:latest

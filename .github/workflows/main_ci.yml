@@ -46,7 +46,7 @@ jobs:
           export PYTHONPATH=$PYTHONPATH:$(pwd)
           python -m pytest -v api/tests/test_api.py
 
-  # JOB 2 : Validation Terraform (Infrastructure & Volumes)
+  # JOB 2 : Validation Terraform
   terraform-quality:
     runs-on: ubuntu-latest
     steps:
@@ -65,7 +65,7 @@ jobs:
         run: terraform fmt -check
         working-directory: ./terraform
 
-  # JOB 3 : Validation de TOUS les DAGs (ETL + ML) et Plugins
+  # JOB 3 : Validation Airflow (DAGs + Plugins)
   airflow-validation:
     runs-on: ubuntu-latest
     steps:
@@ -74,25 +74,22 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-      - name: Install Airflow, Providers & ML Deps
+      - name: Install Airflow & Deps
         run: |
           python -m pip install --upgrade pip
-          # Installation des librairies pour l'ETL et le ML
-          pip install apache-airflow \
+          # Installation incluant psycopg2-binary pour que les hooks Postgres soient validés
+          pip install "apache-airflow>=2.10.0" \
+                      psycopg2-binary \
                       apache-airflow-providers-postgres \
                       apache-airflow-providers-http \
                       apache-airflow-providers-common-sql \
                       prometheus-client pandas pyarrow mlflow scikit-learn requests selenium
-      - name: Static DAG Load Test (ETL + ML)
+      - name: Static DAG Load Test
         env:
-          # --- SUGGESTION : Mocker les variables Airflow pour éviter les erreurs d'import ---
-          # Airflow lira ces variables d'env comme si elles étaient en base de données
           AIRFLOW_VAR_PUSHGATEWAY_URL: "localhost:9091"
           AIRFLOW_VAR_CONNECTION_ID: "airlines"
         run: |
-          # Simulation du PYTHONPATH pour inclure les plugins
           export PYTHONPATH=$PYTHONPATH:$(pwd)/airflow/plugins
-          # Scan de tout le dossier dags pour détecter d'éventuelles ImportErrors
           python -c "from airflow.models import DagBag; dagbag = DagBag(dag_folder='airflow/dags', include_examples=False); print('Import Errors Found:', dagbag.import_errors); exit(1 if len(dagbag.import_errors) > 0 else 0)"
 
   # JOB 4 : Vérification du Build Docker (Dry Run)
@@ -100,7 +97,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Create dummy volumes for CI
+        run: |
+          docker volume create postgres-db-volume-terraform
+          docker volume create mlflow-artifacts-terraform
+          docker volume create airflow-data-terraform
+          
       - name: Validate Docker Compose Config
+        env:
+          AIRFLOW_JWT_SECRET: "static_secret_for_ci_validation_32_chars"
+          AIRFLOW_FERNET_KEY: "static_fernet_key_for_ci_validation="
+          POSTGRES_USER: "test"
+          POSTGRES_PASSWORD: "test"
+          AIRFLOW_POSTGRES_DB: "test"
+          AIRLINES_POSTGRES_DB: "test"
         run: docker compose config
+        
       - name: Build Airflow Images (Dry Run)
         run: docker compose build airflow-init

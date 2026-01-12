@@ -13,3 +13,18 @@ $apiResponse = Invoke-WebRequest -Uri "https://opensky-network.org/api/states/al
 
 # Affiche les crédits restants et le quota total
 $apiResponse.Headers | Select-Object "X-Rate-Limit-Limit", "X-Rate-Limit-Remaining", "X-Rate-Limit-Reset"
+
+
+
+
+# Supprime les fichiers générés
+Remove-Item .env -ErrorAction SilentlyContinue
+Remove-Item .\airflow\config\variables.json -ErrorAction SilentlyContinue
+
+# Nettoie Terraform
+Remove-Item -Recurse -Force .\terraform\.terraform\ -ErrorAction SilentlyContinue
+Remove-Item .\terraform\.terraform.lock.hcl -ErrorAction SilentlyContinue
+Remove-Item .\terraform\terraform.tfstate* -ErrorAction SilentlyContinue
+
+# Nettoyage Docker
+docker system prune -f

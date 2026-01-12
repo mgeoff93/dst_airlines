@@ -9,7 +9,12 @@ variable "POSTGRES_PORT" {
   default = 5432
 }
 
-variable "POSTGRES_DB" {
+variable "AIRFLOW_POSTGRES_DB" {
+  type    = string
+  default = "airflow"
+}
+
+variable "AIRLINES_POSTGRES_DB" {
   type    = string
   default = "airlines"
 }
@@ -87,7 +92,17 @@ variable "SELENIUM_WAIT_TIME" {
   default = 10
 }
 
+variable "SELENIUM_POOL_SIZE" {
+  type    = number
+  default = 4
+}
+
 # --- Airflow & Services ---
+variable "AIRFLOW_FERNET_KEY" {
+  type      = string
+  sensitive = true
+}
+
 variable "CONNECTION_ID" {
   type    = string
   default = "airlines"
@@ -101,6 +116,16 @@ variable "AIRFLOW_API_URL" {
 variable "MLFLOW_API_URL" {
   type    = string
   default = "http://mlflow:5000"
+}
+
+variable "AIRFLOW_PROJ_DIR" {
+  type    = string
+  default = "."
+}
+
+variable "AIRFLOW_UID" {
+  type    = number
+  default = 50000
 }
 
 # --- Monitoring ---
