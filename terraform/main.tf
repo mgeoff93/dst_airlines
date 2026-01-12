@@ -29,6 +29,8 @@ resource "local_file" "airflow_variables" {
     "SELENIUM_WAIT_TIME"   = var.SELENIUM_WAIT_TIME
     "PUSHGATEWAY_URL"      = var.PUSHGATEWAY_URL
     "CONNECTION_ID"        = var.CONNECTION_ID
+    "MLFLOW_API_URL"       = var.MLFLOW_API_URL
+    "AIRFLOW_API_URL"      = var.AIRFLOW_API_URL    
   })
 }
 
@@ -39,6 +41,7 @@ resource "local_file" "docker_env" {
     POSTGRES_USER=${var.POSTGRES_USER}
     POSTGRES_PASSWORD=${var.POSTGRES_PASSWORD}
     POSTGRES_DB=${var.POSTGRES_DB}
+    POSTGRES_PORT=${var.POSTGRES_PORT}
     AIRFLOW_PROJ_DIR=.
   EOT
 }

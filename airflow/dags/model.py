@@ -25,7 +25,7 @@ default_args = {
 @dag(
     dag_id = "model",
     default_args = default_args,
-    schedule = "0 * * * *",
+    schedule = None, #"0 * * * *",
     catchup = False,
     tags = ["airlines", "ml", "mlflow"],
 )

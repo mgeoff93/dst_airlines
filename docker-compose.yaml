@@ -1,5 +1,3 @@
-version: '3.8'
-
 networks:
   airflow_network:
     external: true
@@ -43,10 +41,10 @@ x-airflow-common:
     - ./airflow/config:/opt/airflow/config
     - ./airflow/plugins:/opt/airflow/plugins
     - mlflow_artifacts:/mlflow/artifacts
-    - airflow_data:/opt/airflow/data
+    - ./airflow/data:/opt/airflow/data
   networks:
     - airflow_network
-  user: "1000:0"
+  user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
     redis:
@@ -102,7 +100,8 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - MLFLOW_BACKEND_STORE_URI=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/mlflow
+      - MLFLOW_HTTP_HOST=0.0.0.0
+      - MLFLOW_BACKEND_STORE_URI=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/mlflow
       - MLFLOW_ARTIFACT_ROOT=/mlflow/artifacts
     volumes:
       - mlflow_artifacts:/mlflow/artifacts
@@ -110,7 +109,7 @@ services:
       - airflow_network
     command: >
       mlflow server
-      --backend-store-uri postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/mlflow
+      --backend-store-uri postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/mlflow
       --default-artifact-root /mlflow/artifacts
       --host 0.0.0.0
     restart: always
@@ -143,6 +142,7 @@ services:
       - |
         airflow db migrate
         airflow variables import /opt/airflow/config/variables.json
+        airflow connections add 'airlines' --conn-type 'postgres' --conn-host 'postgres' --conn-login "${POSTGRES_USER}" --conn-password "${POSTGRES_PASSWORD}" --conn-port "${POSTGRES_PORT}" --conn-schema "${POSTGRES_DB}"
         airflow pools set selenium_pool 4 "Pool pour limiter les sessions Selenium"
         airflow users create --username ${POSTGRES_USER} --firstname Admin --lastname Admin --role Admin --email admin@example.com --password ${POSTGRES_PASSWORD}
     environment:
@@ -158,7 +158,7 @@ services:
       - "8000:8000"
     environment:
       POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
+      POSTGRES_PORT: ${POSTGRES_PORT}
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -169,7 +169,7 @@ services:
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter
     environment:
-      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable"
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable"
     networks:
       - airflow_network
     restart: always
@@ -223,3 +223,9 @@ services:
       - airflow_network
     depends_on:
       - prometheus
+
+  init-permissions:
+    image: alpine
+    volumes:
+      - ./data:/data
+    command: chmod -R 777 /data

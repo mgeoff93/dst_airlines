@@ -32,7 +32,7 @@ default_args = {
 @dag(
 	dag_id = "etl",
 	default_args = default_args,
-	schedule = "*/2 * * * *",
+	schedule = None, #"*/2 * * * *",
 	catchup = False,
 	max_active_runs = 1,
 	tags = ["airlines", "etl"]
