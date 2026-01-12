@@ -66,7 +66,6 @@ jobs:
         working-directory: ./terraform
 
   # JOB 3 : Validation de TOUS les DAGs (ETL + ML) et Plugins
-  # Vérifie que les fichiers dans airflow/dags sont syntaxiquement corrects et importables
   airflow-validation:
     runs-on: ubuntu-latest
     steps:
@@ -78,13 +77,18 @@ jobs:
       - name: Install Airflow, Providers & ML Deps
         run: |
           python -m pip install --upgrade pip
-          # Installation des librairies pour l'ETL (Providers) et le ML
+          # Installation des librairies pour l'ETL et le ML
           pip install apache-airflow \
                       apache-airflow-providers-postgres \
                       apache-airflow-providers-http \
                       apache-airflow-providers-common-sql \
-                      pandas pyarrow mlflow scikit-learn requests selenium
+                      prometheus-client pandas pyarrow mlflow scikit-learn requests selenium
       - name: Static DAG Load Test (ETL + ML)
+        env:
+          # --- SUGGESTION : Mocker les variables Airflow pour éviter les erreurs d'import ---
+          # Airflow lira ces variables d'env comme si elles étaient en base de données
+          AIRFLOW_VAR_PUSHGATEWAY_URL: "localhost:9091"
+          AIRFLOW_VAR_CONNECTION_ID: "airlines"
         run: |
           # Simulation du PYTHONPATH pour inclure les plugins
           export PYTHONPATH=$PYTHONPATH:$(pwd)/airflow/plugins
@@ -92,7 +96,6 @@ jobs:
           python -c "from airflow.models import DagBag; dagbag = DagBag(dag_folder='airflow/dags', include_examples=False); print('Import Errors Found:', dagbag.import_errors); exit(1 if len(dagbag.import_errors) > 0 else 0)"
 
   # JOB 4 : Vérification du Build Docker (Dry Run)
-  # Garantit que les modifications dans requirements.txt ne cassent pas le build
   docker-build-check:
     runs-on: ubuntu-latest
     steps:
@@ -100,5 +103,4 @@ jobs:
       - name: Validate Docker Compose Config
         run: docker compose config
       - name: Build Airflow Images (Dry Run)
-        # On build le service de base pour valider les dépendances système et pip
         run: docker compose build airflow-init

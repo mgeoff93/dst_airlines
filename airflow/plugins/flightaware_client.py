@@ -1,20 +1,55 @@
 import logging
 import re
 from datetime import datetime, timezone
+
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
+
 from airflow.models import Variable
+
+from prometheus_client import CollectorRegistry, Gauge, Counter, push_to_gateway
 
 class FlightAwareClient:
 	CODE_REGEX = re.compile(r"^[A-Z]{3}$")
 
 	def __init__(self, selenium_client, postgres_client):
 		self.base_url = Variable.get("FLIGHTAWARE_BASE_URL")
-		self.wait_time = int(Variable.get("SELENIUM_WAIT_TIME", default_var=5))
+		self.wait_time = int(Variable.get("SELENIUM_WAIT_TIME"))
+		self.pushgateway_url = Variable.get("PUSHGATEWAY_URL")
 		self.selenium = selenium_client
 		self.postgres = postgres_client
+
+		# --- Initialisation Prometheus ---
+		self.registry = CollectorRegistry()
+		
+		# Métriques de performance Scraping
+		self.metric_selenium_timeouts = Counter(
+			'flightaware_selenium_timeouts_total', 
+			'Nombre de timeouts lors du chargement des éléments Selenium',
+			['callsign'],
+			registry=self.registry
+		)
+		# Métriques métier
+		self.metric_flights_parsed = Counter(
+			'flightaware_flights_parsed_total', 
+			'Nombre total de vols traités par FlightAware',
+			['type'], # 'static' ou 'dynamic'
+			registry=self.registry
+		)
+		self.metric_commercial_status = Gauge(
+			'flightaware_last_flight_commercial', 
+			'1 si le dernier vol traité était commercial, 0 sinon',
+			registry=self.registry
+		)
+
+	def _push_metrics(self):
+		"""Envoie les métriques au Pushgateway."""
+		try:
+			push_to_gateway(self.pushgateway_url, job='airflow_flightaware', registry=self.registry)
+		except Exception as e:
+			logging.warning(f"Prometheus push failed for FlightAware: {e}")
 
 	def _prepare_page(self, callsign, selector="div.flightPageSummary", load_page=True):
 		if load_page:
@@ -24,20 +59,21 @@ class FlightAwareClient:
 				logging.error(f"{callsign}: Page load error: {e}")
 				return False
 		try:
-			# On attend juste la présence (éclair)
 			WebDriverWait(self.selenium.driver, self.wait_time).until(
 				EC.presence_of_element_located((By.CSS_SELECTOR, selector))
 			)
 			return True
 		except TimeoutException:
+			self.metric_selenium_timeouts.labels(callsign=callsign).inc()
+			self._push_metrics()
 			return False
 
 	def parse_static_flight(self, callsign):
-		# Utilisation du sélecteur details pour s'assurer que le contenu métier est chargé
 		if not self._prepare_page(callsign, selector = "div.flightPageDetails"):
+			self.metric_commercial_status.set(0)
+			self._push_metrics()
 			return {"callsign": callsign, "airline_name": None, "origin_code": None, "destination_code": None, "commercial_flight": False}
 
-		# Lecture immédiate sans boucle de retry
 		airline_name = self.selenium.request("div.flightPageDetails > div:nth-child(9) > div:nth-child(2) > div > div > div:nth-child(2) a")
 		origin_raw = self.selenium.request("div.flightPageSummaryOrigin .flightPageSummaryAirportCode span")
 		destination_raw = self.selenium.request("div.flightPageSummaryDestination .flightPageSummaryAirportCode span")
@@ -46,6 +82,11 @@ class FlightAwareClient:
 		destination = self._normalize_airport_code(destination_raw)
 
 		is_commercial = any([airline_name, origin, destination])
+		
+		# Update métriques
+		self.metric_flights_parsed.labels(type='static').inc()
+		self.metric_commercial_status.set(1 if is_commercial else 0)
+		self._push_metrics()
 
 		return {
 			"callsign": callsign,
@@ -78,9 +119,14 @@ class FlightAwareClient:
 				break
 
 		sched_dep = self._get_scheduled_time("departure")
-		if not sched_dep: return None
+		if not sched_dep: 
+			self._push_metrics()
+			return None
 
 		new_key = f"{callsign}_{icao24}_{current_date}_{sched_dep.strftime('%H:%M')}"
+		
+		self.metric_flights_parsed.labels(type='dynamic').inc()
+		self._push_metrics()
 
 		if dynamic and dynamic.get("unique_key") == new_key:
 			return {

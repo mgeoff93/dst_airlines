@@ -27,6 +27,7 @@ resource "local_file" "airflow_variables" {
     "FLIGHTAWARE_BASE_URL" = var.FLIGHTAWARE_BASE_URL
     "SELENIUM_REMOTE_URL"  = var.SELENIUM_REMOTE_URL
     "SELENIUM_WAIT_TIME"   = var.SELENIUM_WAIT_TIME
+    "PUSHGATEWAY_URL"      = var.PUSHGATEWAY_URL
     "CONNECTION_ID"        = var.CONNECTION_ID
   })
 }

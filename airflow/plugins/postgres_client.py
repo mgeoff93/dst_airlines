@@ -1,15 +1,43 @@
 import logging
-from airflow.models import Variable
-from airflow.providers.postgres.hooks.postgres import PostgresHook
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
+
+from airflow.models import Variable
+from airflow.providers.postgres.hooks.postgres import PostgresHook
+
+from prometheus_client import CollectorRegistry, Counter, push_to_gateway
 
 class PostgresClient:
 	def __init__(self):
 		conn_id = Variable.get("CONNECTION_ID")
-		self.hook = PostgresHook(postgres_conn_id=conn_id)
+		self.hook = PostgresHook(postgres_conn_id = conn_id)
 		self.conn = self.hook.get_conn()
 		self.cur = self.conn.cursor()
+		self.pushgateway_url = Variable.get("PUSHGATEWAY_URL")
+
+		# --- Initialisation Prometheus ---
+		self.registry = CollectorRegistry()
+		
+		# Métriques de performance DB
+		self.metric_db_operations = Counter(
+			'postgres_operations_total', 
+			'Nombre d opérations DB par table et type',
+			['table', 'operation', 'status'], # ex: table='live_data', op='insert', status='success'
+			registry=self.registry
+		)
+		# Métrique métier : Nettoyage automatique
+		self.metric_auto_closures = Counter(
+			'postgres_flights_auto_closed_total', 
+			'Nombre de vols clôturés automatiquement par timeout',
+			registry=self.registry
+		)
+
+	def _push_metrics(self):
+		"""Envoie les métriques au Pushgateway."""
+		try:
+			push_to_gateway(self.pushgateway_url, job='airflow_postgres', registry=self.registry)
+		except Exception as e:
+			logging.warning(f"Prometheus push failed for Postgres: {e}")
 
 	def get_static_flight(self, callsign: str) -> Optional[Dict]:
 		"""Récupère les infos statiques pour le triage."""
@@ -30,30 +58,20 @@ class PostgresClient:
 		return result is not None
 
 	def needs_refresh(self, callsign: str, icao24: str, on_ground: bool, threshold_minutes: int = 10) -> bool:
-		"""
-		Détermine si un vol a besoin d'un nouveau scraping.
-		Utilise datetime.now(timezone.utc) pour éviter les décalages Naive/Aware.
-		"""
 		dynamic = self.get_latest_dynamic_flight(callsign, icao24)
 		if not dynamic:
 			return True
 
-		# Heure actuelle avec fuseau UTC
 		now = datetime.now(timezone.utc)
-		
-		# S'assurer que last_update est bien "conscient" du fuseau UTC
 		last_upd = dynamic["last_update"]
 		if last_upd.tzinfo is None:
 			last_upd = last_upd.replace(tzinfo=timezone.utc)
 
 		diff_minutes = (now - last_upd).total_seconds() / 60
-		
-		logging.info(f"DEBUG REFRESH: {callsign} | Last update: {diff_minutes:.1f} min ago | Threshold: {threshold_minutes} min")
-		
+		logging.info(f"DEBUG REFRESH: {callsign} | Last update: {diff_minutes:.1f} min ago")
 		return diff_minutes > threshold_minutes
 
 	def get_latest_dynamic_flight(self, callsign: str, icao24: str) -> Optional[Dict]:
-		"""Récupère la dernière entrée dynamique et gère le statut des vols expirés."""
 		query = """
 			SELECT icao24, callsign, flight_date, departure_scheduled, departure_actual, 
 				   arrival_scheduled, arrival_actual, status, last_update, unique_key
@@ -72,18 +90,20 @@ class PostgresClient:
 		]
 		dynamic = dict(zip(columns, result))
 
-		# Correction : On s'assure que last_update est aware pour la comparaison de statut
 		last_update = dynamic["last_update"]
 		if last_update.tzinfo is None:
 			last_update = last_update.replace(tzinfo=timezone.utc)
 
-		# Si le vol est marqué en cours mais n'a pas bougé depuis 90 min (marge augmentée), on le clôture
 		if dynamic["status"] in ("en route", "departing"):
 			now = datetime.now(timezone.utc)
 			if (now - last_update) > timedelta(minutes=90):
 				update_sql = "UPDATE flight_dynamic SET status = 'arrived' WHERE unique_key = %s"
 				self.hook.run(update_sql, parameters=(dynamic["unique_key"],))
 				dynamic["status"] = "arrived"
+				
+				# Update métrique auto-clôture
+				self.metric_auto_closures.inc()
+				self._push_metrics()
 				logging.info(f"Auto-closing flight {callsign} (Timeout)")
 				
 		return dynamic
@@ -101,10 +121,13 @@ class PostgresClient:
 		for row in rows:
 			try:
 				self.cur.execute(query, row)
-				self.conn.commit() # Commit individuel pour éviter de perdre tout le batch en cas d'erreur
+				self.conn.commit()
+				self.metric_db_operations.labels(table='flight_static', operation='upsert', status='success').inc()
 			except Exception as e:
 				self.conn.rollback()
+				self.metric_db_operations.labels(table='flight_static', operation='upsert', status='error').inc()
 				logging.error(f"Static insert failed for {row.get('callsign')}: {e}")
+		self._push_metrics()
 
 	def insert_flight_dynamic(self, rows: List[Dict]):
 		if not rows: return
@@ -125,9 +148,12 @@ class PostgresClient:
 			try:
 				self.cur.execute(query, row)
 				self.conn.commit()
+				self.metric_db_operations.labels(table='flight_dynamic', operation='upsert', status='success').inc()
 			except Exception as e:
 				self.conn.rollback()
+				self.metric_db_operations.labels(table='flight_dynamic', operation='upsert', status='error').inc()
 				logging.error(f"Dynamic upsert failed for {row.get('unique_key')}: {e}")
+		self._push_metrics()
 
 	def insert_live_data(self, rows: List[Dict]):
 		if not rows: return
@@ -142,19 +168,21 @@ class PostgresClient:
 					%(visibility)s, %(cloud_coverage)s, %(rain)s, %(global_condition)s, %(unique_key)s)
 		"""
 		for row in rows:
-			# Sécurité : On s'assure que les clés de jointure sont présentes
 			if not all([row.get("flight_date"), row.get("departure_scheduled"), row.get("unique_key")]):
-				logging.warning(f"Live data skipped for {row.get('callsign')}: Missing keys")
 				continue
 			try:
 				self.cur.execute(query, row)
 				self.conn.commit()
+				self.metric_db_operations.labels(table='live_data', operation='insert', status='success').inc()
 			except Exception as e:
 				self.conn.rollback()
+				self.metric_db_operations.labels(table='live_data', operation='insert', status='error').inc()
 				logging.error(f"Live insert failed for {row.get('callsign')}: {e}")
+		self._push_metrics()
 
 	def close(self):
 		try:
+			self._push_metrics()
 			self.cur.close()
 			self.conn.close()
 		except: 

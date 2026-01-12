@@ -5,6 +5,9 @@ from typing import List, Dict, Optional
 
 from airflow.decorators import dag, task
 from airflow.exceptions import AirflowFailException
+from airflow.models import Variable
+
+from prometheus_client import CollectorRegistry, Counter, push_to_gateway
 
 from opensky_client import OpenskyClient
 from weather_client import WeatherClient
@@ -36,18 +39,39 @@ default_args = {
 )
 def flight_data_pipeline():
 
+	# --- Métriques Globales du DAG ---
+	def push_dag_metrics(registry):
+		try:
+			gateway_url = Variable.get("PUSHGATEWAY_URL")
+			push_to_gateway(gateway_url, job = "airflow_dag_etl", registry=registry)
+		except Exception as e:
+			logging.warning(f"Failed to push DAG metrics: {e}")
+
 	@task
 	def requesting(airline_filter: str = "AFR") -> List[Dict]:
+		registry = CollectorRegistry()
+		metric_extracted = Counter('etl_extracted_flights_total', 'Vols extraits d OpenSky', registry=registry)
+		
+		# --- AJOUT : Métrique de sécurité pour le monitoring des erreurs ---
+		metric_errors = Counter('etl_api_errors_total', 'Erreurs critiques lors des appels API', ['api_name'], registry=registry)
+		
 		logging.info("=== EXTRACT: OpenSky API ===")
 		openskycli = OpenskyClient()
 		raw = openskycli.get_rawdata()
 	
-		# Si le quota est dépassé (None), on stoppe tout de suite proprement
 		if raw is None: 
-			raise AirflowFailException("OpenSky quota exceeded. Stopping DAG run.")
+			# On incrémente l'erreur spécifique à OpenSky avant de push et de crash
+			metric_errors.labels(api_name='opensky').inc()
+			push_dag_metrics(registry)
+			raise AirflowFailException("OpenSky quota exceeded or API down. Stopping DAG run.")
 	
 		flights = openskycli.normalize_rawdata(raw, filter=airline_filter)
-	
+		
+		if flights:
+			metric_extracted.inc(len(flights))
+			
+		push_dag_metrics(registry)
+		
 		if not flights: 
 			logging.info("No flights matching the filter found.")
 			return []
@@ -58,12 +82,15 @@ def flight_data_pipeline():
 
 	@task
 	def triage(flights: List[Dict]) -> Dict[str, List[Dict]]:
+		registry = CollectorRegistry()
+		metric_triage = Counter('etl_triage_total', 'Répartition du triage', ['type'], registry=registry)
+		
 		if not flights:
 			logging.info("Triage received an empty flight list.")
 			return {"scrape": [], "direct": []}
 
 		postgrescli = PostgresClient()
-		weathercli = WeatherClient() # Initialisation pour les vols directs
+		weathercli = WeatherClient() 
 		needs_scrape = []
 		direct_live = []
 	
@@ -71,8 +98,7 @@ def flight_data_pipeline():
 			for f in flights:
 				current_static = postgrescli.get_static_flight(f["callsign"])
 				latest_dynamic = postgrescli.get_latest_dynamic_flight(f["callsign"], f["icao24"])
-	
-				# Condition de "complétude"
+				
 				is_incomplete = False
 				if current_static:
 					is_incomplete = not all([
@@ -81,24 +107,23 @@ def flight_data_pipeline():
 						current_static.get("destination_code")
 					])
 	
-				# Décision
 				if not current_static or is_incomplete or postgrescli.needs_refresh(f["callsign"], f["icao24"], f["on_ground"]):
-					logging.info(f"Triage: {f['callsign']} needs scrape.")
 					needs_scrape.append(f)
+					metric_triage.labels(type='scrape').inc()
 				elif latest_dynamic:
-					# VOL DIRECT : On récupère la météo ici car on ne passe pas par scraping()
 					lat, lon = f.get("latitude"), f.get("longitude")
 					if lat and lon:
 						f.update(weathercli.get_weather(lat, lon))
 	
-					# Préparation de la ligne live avec la clé existante
 					f.update({
 						"departure_scheduled": latest_dynamic["departure_scheduled"].strftime("%H:%M:%S") if latest_dynamic["departure_scheduled"] else None,
 						"flight_date": latest_dynamic["flight_date"],
 						"unique_key": latest_dynamic["unique_key"]
 					})
 					direct_live.append(f)
+					metric_triage.labels(type='direct').inc()
 	
+			push_dag_metrics(registry)
 			return {"scrape": needs_scrape, "direct": direct_live}
 		finally:
 			postgrescli.close()
@@ -109,6 +134,7 @@ def flight_data_pipeline():
 		postgrescli = PostgresClient()
 		weathercli = WeatherClient()
 		flightawarecli = FlightAwareClient(seleniumcli, postgrescli)
+		
 		def time_to_str(t): return t.strftime("%H:%M:%S") if t else None
 	
 		try:
@@ -150,43 +176,48 @@ def flight_data_pipeline():
 
 	@task
 	def loading(scrape_results: List[Optional[Dict]], direct_rows: List[Dict]):
+		registry = CollectorRegistry()
+		metric_loaded = Counter('etl_loaded_rows_total', 'Lignes chargées en DB', ['table'], registry=registry)
+		
 		postgrescli = PostgresClient()
 		try:
 			all_static, all_dynamic, all_live = [], [], []
 			
-			# 1. Données issues du scraping
 			for r in scrape_results:
 				if not r: continue
 				all_static.extend(r.get("static_rows", []))
 				all_dynamic.extend(r.get("dynamic_rows", []))
 				all_live.extend(r.get("live_rows", []))
 
-			# 2. Données directes (positions sans scrape)
 			if direct_rows:
-				# On peut ajouter la météo ici pour les direct_rows si nécessaire
 				all_live.extend(direct_rows)
 
-			if all_static: postgrescli.insert_flight_static(all_static)
-			if all_dynamic: postgrescli.insert_flight_dynamic(all_dynamic)
-			if all_live: postgrescli.insert_live_data(all_live)
+			if all_static: 
+				postgrescli.insert_flight_static(all_static)
+				metric_loaded.labels(table='static').inc(len(all_static))
+			if all_dynamic: 
+				postgrescli.insert_flight_dynamic(all_dynamic)
+				metric_loaded.labels(table='dynamic').inc(len(all_dynamic))
+			if all_live: 
+				postgrescli.insert_live_data(all_live)
+				metric_loaded.labels(table='live').inc(len(all_live))
+			
+			push_dag_metrics(registry)
 		finally:
 			postgrescli.close()
 
 	# --- Orchestration ---
 	triage_results = triage(requesting())
 
-	# On crée deux petites tâches "helper" pour extraire les listes
 	@task
 	def get_scrape_list(res): return res["scrape"]
 	
 	@task
 	def get_direct_list(res): return res["direct"]
 
-	# On extrait les listes via ces tâches
 	list_to_scrape = get_scrape_list(triage_results)
 	list_direct = get_direct_list(triage_results)
 
-	# Maintenant le mapping fonctionne car list_to_scrape est le résultat direct d'une tâche
 	scraped_data = scraping.expand(flight = list_to_scrape)
 	
 	loading(
