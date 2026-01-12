@@ -1,3 +1,4 @@
+import logging
 import requests
 import pandas as pd
 import numpy as np
@@ -5,9 +6,18 @@ import matplotlib.pyplot as plt
 import mlflow
 import mlflow.sklearn
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, mean_absolute_percentage_error, max_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, max_error
 from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.preprocessing import LabelEncoder
+from airflow.exceptions import AirflowSkipException
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OrdinalEncoder
+
+logging.basicConfig(
+    format = "[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s",
+    datefmt = "%Y-%m-%dT%H:%M:%S",
+    level = logging.INFO
+)
 
 class MLClient:
     def __init__(self):
@@ -16,60 +26,103 @@ class MLClient:
         mlflow.set_tracking_uri(self.mlflow_uri)
         mlflow.set_experiment("model_arrival_difference")
 
-    def data_preprocessing(self) -> pd.DataFrame:
-        df_live_history = pd.DataFrame(requests.get(f"{self.api_url}/live/history/all", timeout=30).json()["data"])
-        df_dynamic_history = pd.DataFrame(requests.get(f"{self.api_url}/dynamic", params={"status": "history"}, timeout=30).json()["data"])
+    def optimize_memory(self, df: pd.DataFrame) -> pd.DataFrame:
+        for col in df.columns:
+            if df[col].dtype == "float64": df[col] = df[col].astype("float32")
+            if df[col].dtype == "int64": df[col] = df[col].astype("int32")
+        return df
 
-        merge_cols = ["unique_key"]
-        target_cols = ["departure_difference", "arrival_difference"]
-        df_merged = df_live_history.merge(df_dynamic_history[merge_cols + target_cols], on="unique_key", how="left")
+    def data_preprocessing(self) -> str:
+        try:
+            res_live = requests.get(f"{self.api_url}/live/history/all", timeout=30)
+            res_dynamic = requests.get(f"{self.api_url}/dynamic", params={"status": "history"}, timeout=30)
+            
+            data_live = res_live.json().get("data", [])
+            data_dynamic = res_dynamic.json().get("data", [])
 
-        df_strict = df_merged.dropna(subset=["callsign", "icao24", "longitude", "latitude", "departure_difference", "arrival_difference"])
+            if not data_live or not data_dynamic:
+                raise AirflowSkipException("Pas assez de données en base pour l'entraînement.")
 
-        features = ["callsign", "icao24", "longitude", "latitude", "geo_altitude", "velocity", 
-                    "global_condition", "departure_difference", "arrival_difference"]
+            df_live_history = pd.DataFrame(data_live)
+            df_dynamic_history = pd.DataFrame(data_dynamic)
+
+            merge_cols = ["unique_key"]
+            target_cols = ["departure_difference", "arrival_difference"]
+            df_merged = df_live_history.merge(df_dynamic_history[merge_cols + target_cols], on="unique_key", how="left")
+
+            df_strict = df_merged.dropna(subset=["callsign", "icao24", "longitude", "latitude", "departure_difference", "arrival_difference"])
+
+            features = ["callsign", "icao24", "longitude", "latitude", "geo_altitude", "velocity", 
+                        "global_condition", "departure_difference", "arrival_difference"]
+
+            df_features = df_strict[features].copy()
+
+            for col in ["geo_altitude", "velocity"]: df_features[col] = df_features[col].fillna(0)
+            df_features["global_condition"] = df_features["global_condition"].fillna("Unknown")
+
+            df_features = df_features[df_features["arrival_difference"].between(-60, 300)]
+            
+            df_features = self.optimize_memory(df_features)
+
+            MAX_ROWS = 500000
+            
+            if len(df_features) > MAX_ROWS:
+                logging.warning(f"Dataset trop large ({len(df_features)} lignes). Sampling à {MAX_ROWS}.")
+                df_features = df_features.sample(n = MAX_ROWS, random_state = 42)
+
+            if len(df_features) < 10:
+                raise AirflowSkipException(f"Volume insuffisant : {len(df_features)} lignes.")
+
+            file_path = "/opt/airflow/data/processed_data.parquet"
+            df_features.to_parquet(file_path, engine = "pyarrow")
+            
+            logging.info(f"Data saved to {file_path} (Rows: {len(df_features)})")
+            return file_path
         
-        df_features = df_strict[features].copy()
+        except requests.RequestException as e:
+            logging.error(f"Erreur API : {e}")
+            raise
 
-        for col in ["geo_altitude", "velocity"]: df_features[col] = df_features[col].fillna(0)
-        df_features["global_condition"] = df_features["global_condition"].fillna("Unknown")
-        
-        df_features = df_features[df_features["arrival_difference"].between(-60, 300)]
-        
-        return df_features
-
-    def train_and_log_model(self, data: pd.DataFrame):
+    def train_and_log_model(self, file_path: str):
+        data = pd.read_parquet(file_path)
         TARGET = "arrival_difference"
 
-        X = data.drop(columns=[TARGET])
+        X = data.drop(columns = [TARGET])
         y = data[TARGET]
 
         categorical_cols = ["callsign", "icao24", "global_condition"]
-        for col in categorical_cols:
-            le = LabelEncoder()
-            X[col] = le.fit_transform(X[col].astype(str))
+        preprocessor = ColumnTransformer(
+            transformers = [
+                ('cat', OrdinalEncoder(handle_unknown = "use_encoded_value", unknown_value = -1), categorical_cols)
+            ], 
+            remainder = "passthrough"
+        )
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 42)
 
-        with mlflow.start_run(run_name = "Run_Optimized_Model"):
-            rf = RandomForestRegressor(random_state = 42)
-            
-            # --- OPTIMISATION : Paramètres plus robustes et calcul plus rapide ---
+        with mlflow.start_run(run_name = "Optimized model"):
+            # Pipeline complet
+            pipeline = Pipeline(steps=[
+                ("preprocessor", preprocessor), 
+                ("regressor", RandomForestRegressor(random_state = 42, n_jobs = -1))
+            ])            
+
             param_grid = {
-                'n_estimators': [100],
-                'max_depth': [10, 15],
-                'min_samples_leaf': [5]
+                "regressor__n_estimators": [100],
+                "regressor__max_depth": [10, 15],
+                "regressor__min_samples_leaf": [5]
             }
             
-            grid_search = GridSearchCV(estimator = rf, param_grid = param_grid, cv = 2, n_jobs = 1, scoring = 'r2')
+            grid_search = GridSearchCV(pipeline, param_grid, cv = 2, n_jobs = 1, scoring = "r2")
             grid_search.fit(X_train, y_train)
             
-            model = grid_search.best_estimator_
+            best_model = grid_search.best_estimator_
 
+            # Logging MLflow
             mlflow.log_params(grid_search.best_params_)
-            mlflow.log_param("features_used", X.columns.to_list())
+            mlflow.log_dict(data.describe().to_dict(), "dataset_summary.json")
 
-            y_pred = model.predict(X_test)
+            y_pred = best_model.predict(X_test)
 
             metrics = {
                 "MAE": mean_absolute_error(y_test, y_pred),
@@ -79,8 +132,8 @@ class MLClient:
             }
             mlflow.log_metrics(metrics)
 
-            # Graphique Importance
-            importances = model.feature_importances_
+            # Feature Importance
+            importances = best_model.named_steps['regressor'].feature_importances_
             indices = np.argsort(importances)
             plt.figure(figsize = (10, 8))
             plt.barh(range(len(indices)), importances[indices], align = "center", color = 'skyblue')
@@ -90,7 +143,7 @@ class MLClient:
             mlflow.log_artifact("feature_importance.png")
             plt.close()
 
-            # Graphique Résidus
+            # Analyse des Résidus
             plt.figure(figsize = (8, 6))
             plt.scatter(y_pred, y_test - y_pred, alpha = 0.5)
             plt.axhline(y = 0, color = 'r', linestyle = '--')
@@ -99,13 +152,14 @@ class MLClient:
             mlflow.log_artifact("residuals.png")
             plt.close()
 
+            # Log du modèle
             try:
                 mlflow.sklearn.log_model(
-                    sk_model = model, 
-                    name = "arrival_delay_model",
+                    sk_model = best_model, 
+                    name = "model",
                     registered_model_name = "ArrivalDelayModel"
                 )
             except Exception as e:
-                print(f"Erreur lors du log du modèle : {e}")
+                logging.error(f"Erreur lors du log du modèle : {e}")
 
             return {**metrics, "rows": int(len(data))}

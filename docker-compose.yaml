@@ -12,6 +12,9 @@ volumes:
   mlflow_artifacts:
     external: true
     name: mlflow-artifacts-terraform
+  airflow_data:
+    external: true
+    name: airflow-data-terraform
 
 x-airflow-common:
   &airflow-common
@@ -41,6 +44,7 @@ x-airflow-common:
     - ./airflow/config:/opt/airflow/config
     - ./airflow/plugins:/opt/airflow/plugins
     - mlflow_artifacts:/mlflow/artifacts
+    - airflow_data:/opt/airflow/data
   networks:
     - airflow_network
   user: "1000:0"

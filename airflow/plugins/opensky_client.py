@@ -40,7 +40,7 @@ class OpenskyClient:
 		attempt = 0
 		while attempt < max_retries:
 			try:
-				response = requests.get(self.api_url, headers=self.headers, timeout=15)
+				response = requests.get(self.api_url, headers = self.headers, timeout=15)
 				
 				# Cas 1 : Quota dépassé
 				if response.status_code == 429:
@@ -81,7 +81,7 @@ class OpenskyClient:
 		
 		raise RuntimeError(f"Failed to get OpenSky data after {max_retries} attempts")
 
-	def normalize_rawdata(self, raw_data, filter=None):
+	def normalize_rawdata(self, raw_data, filter = None):
 		states = raw_data.get("states", [])
 		normalized = []
 		

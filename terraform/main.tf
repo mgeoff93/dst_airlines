@@ -55,3 +55,7 @@ resource "docker_volume" "postgres_data" {
 resource "docker_volume" "mlflow_artifacts" {
   name = "mlflow-artifacts-terraform"
 }
+
+resource "docker_volume" "airflow_data" {
+  name = "airflow-data-terraform"
+}

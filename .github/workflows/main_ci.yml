@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:13 # Aligné avec ton docker-compose
+        image: postgres:13
         env:
           POSTGRES_USER: user_test
           POSTGRES_PASSWORD: password_test
@@ -46,7 +46,7 @@ jobs:
           export PYTHONPATH=$PYTHONPATH:$(pwd)
           python -m pytest -v api/tests/test_api.py
 
-  # JOB 2 : Validation Terraform (Adapté aux variables manquantes)
+  # JOB 2 : Validation Terraform (Infrastructure & Volumes)
   terraform-quality:
     runs-on: ubuntu-latest
     steps:
@@ -58,13 +58,47 @@ jobs:
       - name: Terraform Init
         run: terraform init
         working-directory: ./terraform
-      
-      # On utilise -var-file avec un exemple ou on ignore la validation stricte des valeurs
       - name: Terraform Validate
         run: terraform validate
         working-directory: ./terraform
-
-      # Optionnel : Vérifie si le code est bien formaté
       - name: Terraform Format Check
         run: terraform fmt -check
         working-directory: ./terraform
+
+  # JOB 3 : Validation de TOUS les DAGs (ETL + ML) et Plugins
+  # Vérifie que les fichiers dans airflow/dags sont syntaxiquement corrects et importables
+  airflow-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install Airflow, Providers & ML Deps
+        run: |
+          python -m pip install --upgrade pip
+          # Installation des librairies pour l'ETL (Providers) et le ML
+          pip install apache-airflow \
+                      apache-airflow-providers-postgres \
+                      apache-airflow-providers-http \
+                      apache-airflow-providers-common-sql \
+                      pandas pyarrow mlflow scikit-learn requests selenium
+      - name: Static DAG Load Test (ETL + ML)
+        run: |
+          # Simulation du PYTHONPATH pour inclure les plugins
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/airflow/plugins
+          # Scan de tout le dossier dags pour détecter d'éventuelles ImportErrors
+          python -c "from airflow.models import DagBag; dagbag = DagBag(dag_folder='airflow/dags', include_examples=False); print('Import Errors Found:', dagbag.import_errors); exit(1 if len(dagbag.import_errors) > 0 else 0)"
+
+  # JOB 4 : Vérification du Build Docker (Dry Run)
+  # Garantit que les modifications dans requirements.txt ne cassent pas le build
+  docker-build-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Validate Docker Compose Config
+        run: docker compose config
+      - name: Build Airflow Images (Dry Run)
+        # On build le service de base pour valider les dépendances système et pip
+        run: docker compose build airflow-init

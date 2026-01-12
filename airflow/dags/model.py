@@ -17,7 +17,7 @@ default_args = {
 }
 
 @dag(
-	dag_id = "arrival_difference_model",
+	dag_id = "model",
 	default_args = default_args,
 	schedule = "0 * * * *",
 	catchup = False,
@@ -26,15 +26,15 @@ default_args = {
 def train_model_dag():
 
 	@task
-	def preprocess():
+	def preprocessing():
 		client = MLClient()
 		return client.data_preprocessing()
 
 	@task
-	def train(data):
+	def training(data):
 		client = MLClient()
 		return client.train_and_log_model(data)
 
-	train(preprocess())
+	training(preprocessing())
 
 train_model_dag()
