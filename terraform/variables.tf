@@ -1,17 +1,17 @@
 # --- Base de Données PostgreSQL ---
 variable "POSTGRES_HOST" {
-  type        = string
-  default     = "postgres"
+  type    = string
+  default = "postgres"
 }
 
 variable "POSTGRES_PORT" {
-  type        = number
-  default     = 5432
+  type    = number
+  default = 5432
 }
 
 variable "POSTGRES_DB" {
-  type        = string
-  default     = "airlines"
+  type    = string
+  default = "airlines"
 }
 
 variable "POSTGRES_USER" {
@@ -27,12 +27,12 @@ variable "POSTGRES_PASSWORD" {
 
 # --- OpenSky Network API ---
 variable "OPENSKY_USERNAME" {
-  type        = string
+  type = string
 }
 
 variable "OPENSKY_PASSWORD" {
-  type        = string
-  sensitive   = true
+  type      = string
+  sensitive = true
 }
 
 variable "OPENSKY_TOKEN_URL" {
@@ -105,6 +105,6 @@ variable "MLFLOW_API_URL" {
 
 # --- Monitoring ---
 variable "PUSHGATEWAY_URL" {
-  type        = string
-  default     = "pushgateway:9091"
+  type    = string
+  default = "pushgateway:9091"
 }
