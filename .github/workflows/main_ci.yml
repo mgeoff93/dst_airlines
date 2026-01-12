@@ -77,7 +77,6 @@ jobs:
       - name: Install Airflow & Deps
         run: |
           python -m pip install --upgrade pip
-          # Installation incluant psycopg2-binary pour que les hooks Postgres soient validés
           pip install "apache-airflow>=2.10.0" \
                       psycopg2-binary \
                       apache-airflow-providers-postgres \
@@ -97,21 +96,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Create dummy volumes for CI
+      
+      - name: Create external resources for CI
         run: |
+          # Création des volumes et du network marqués comme "external" dans ton compose
+          docker network create airflow_network_terraform
           docker volume create postgres-db-volume-terraform
           docker volume create mlflow-artifacts-terraform
           docker volume create airflow-data-terraform
+          # Création d'un fichier variables.json fictif pour l'import Airflow
+          mkdir -p airflow/config
+          echo "{}" > airflow/config/variables.json
           
       - name: Validate Docker Compose Config
         env:
-          AIRFLOW_JWT_SECRET: "static_secret_for_ci_validation_32_chars"
-          AIRFLOW_FERNET_KEY: "static_fernet_key_for_ci_validation="
+          # Variables obligatoires pour éviter l'erreur "variable not set"
+          AIRFLOW_JWT_SECRET: "ci_static_secret_32_characters_long"
+          AIRFLOW_FERNET_KEY: "ci_static_fernet_key_validation="
+          AIRFLOW_API_SECRET_KEY: "ci_static_api_secret_key_32_char"
           POSTGRES_USER: "test"
           POSTGRES_PASSWORD: "test"
+          POSTGRES_PORT: 5432
           AIRFLOW_POSTGRES_DB: "test"
           AIRLINES_POSTGRES_DB: "test"
+          MLFLOW_API_URL: "http://localhost:5000"
+          SELENIUM_POOL_SIZE: 2
+          AIRFLOW_PROJ_DIR: "."
         run: docker compose config
         
-      - name: Build Airflow Images (Dry Run)
+      - name: Build Airflow Image (Dry Run)
         run: docker compose build airflow-init

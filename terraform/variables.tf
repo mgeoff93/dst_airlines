@@ -103,6 +103,18 @@ variable "AIRFLOW_FERNET_KEY" {
   sensitive = true
 }
 
+variable "AIRFLOW_JWT_SECRET" {
+  type        = string
+  sensitive   = true
+  description = "Secret utilisé pour l'API Auth d'Airflow 3 (32 caractères min)"
+}
+
+variable "AIRFLOW_API_SECRET_KEY" {
+  type        = string
+  sensitive   = true
+  description = "Clé de signature des sessions Flask et accès logs"
+}
+
 variable "CONNECTION_ID" {
   type    = string
   default = "airlines"
