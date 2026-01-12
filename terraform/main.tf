@@ -42,6 +42,7 @@ resource "local_file" "docker_env" {
     POSTGRES_PASSWORD=${var.POSTGRES_PASSWORD}
     POSTGRES_DB=${var.POSTGRES_DB}
     POSTGRES_PORT=${var.POSTGRES_PORT}
+    MLFLOW_API_URL=${var.MLFLOW_API_URL}
     AIRFLOW_PROJ_DIR=.
   EOT
 }

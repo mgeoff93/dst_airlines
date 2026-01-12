@@ -23,8 +23,8 @@ x-airflow-common:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
     AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
-    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/airflow
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/airflow
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
     AIRFLOW__CORE__FERNET_KEY: ''
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
@@ -34,8 +34,11 @@ x-airflow-common:
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
     AIRFLOW__LOGGING__REMOTE_LOGGING: 'false'
+    AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER: ''
+    AIRFLOW__LOGGING__TASK_LOGGER: 'airflow.utils.log.task_handler.DbTaskHandler'
+    AIRFLOW__LOGGING__HANDLER: 'airflow.utils.log.task_handler.DbTaskHandler'
     PYTHONPATH: "${AIRFLOW_PROJ_DIR:-.}/plugins"
-    MLFLOW_TRACKING_URI: http://mlflow:5000
+    MLFLOW_TRACKING_URI: "${MLFLOW_API_URL}"
   volumes:
     - ./airflow/dags:/opt/airflow/dags
     - ./airflow/config:/opt/airflow/config
@@ -60,7 +63,7 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_DB: airflow
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
       - ./airflow/config/init_airlines.sql:/docker-entrypoint-initdb.d/init_airlines.sql
@@ -140,13 +143,22 @@ services:
     command:
       - -c
       - |
-        airflow db migrate
+        # Gestion des dossiers et permissions
+        mkdir -p /mlflow/artifacts
+        chown -R "50000:0" /mlflow/artifacts
+        chmod -R 775 /mlflow/artifacts
+        mkdir -p /opt/airflow/{dags,plugins,config,logs,data}
+        chown -R "50000:0" /opt/airflow/
+
+        airflow connections import /opt/airflow/config/connections.yaml
         airflow variables import /opt/airflow/config/variables.json
-        airflow connections add 'airlines' --conn-type 'postgres' --conn-host 'postgres' --conn-login "${POSTGRES_USER}" --conn-password "${POSTGRES_PASSWORD}" --conn-port "${POSTGRES_PORT}" --conn-schema "${POSTGRES_DB}"
         airflow pools set selenium_pool 4 "Pool pour limiter les sessions Selenium"
-        airflow users create --username ${POSTGRES_USER} --firstname Admin --lastname Admin --role Admin --email admin@example.com --password ${POSTGRES_PASSWORD}
     environment:
       <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
+      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
     user: "0:0"
 
   api:
