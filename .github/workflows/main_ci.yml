@@ -1,4 +1,4 @@
-name: CI DST Airlines - Full Infrastructure
+name: CI DST Airlines - Infrastructure
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   # JOB 1 : Tests API (Python + Postgres)
-  api-tests:
+  api:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -47,7 +47,7 @@ jobs:
           python -m pytest -v api/tests/test_api.py
 
   # JOB 2 : Validation Terraform
-  terraform-quality:
+  terraform:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -66,7 +66,7 @@ jobs:
         working-directory: ./terraform
 
   # JOB 3 : Validation Airflow (DAGs + Plugins)
-  airflow-validation:
+  airflow:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -92,7 +92,7 @@ jobs:
           python -c "from airflow.models import DagBag; dagbag = DagBag(dag_folder='airflow/dags', include_examples=False); print('Import Errors Found:', dagbag.import_errors); exit(1 if len(dagbag.import_errors) > 0 else 0)"
 
   # JOB 4 : Vérification du Build Docker (Dry Run)
-  docker-build-check:
+  docker:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
