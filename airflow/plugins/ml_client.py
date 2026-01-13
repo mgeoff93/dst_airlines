@@ -3,9 +3,11 @@ import requests
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import os
 
 import mlflow
 import mlflow.sklearn
+from mlflow.tracking import MlflowClient
 
 from airflow.models import Variable
 from airflow.exceptions import AirflowSkipException
@@ -15,47 +17,34 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, m
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
+# Correction : ordinal encoder gère mieux les catégories inconnues avec handle_unknown
 from sklearn.preprocessing import OrdinalEncoder
+from sklearn.impute import SimpleImputer
 
 from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
 
 class MLClient:
 	def __init__(self):
-		self.api_url =  Variable.get("AIRFLOW_API_URL")
+		# Configuration depuis Airflow Variables
+		self.api_url = Variable.get("AIRFLOW_API_URL")
 		self.mlflow_uri = Variable.get("MLFLOW_API_URL")
 		self.pushgateway_url = Variable.get("PUSHGATEWAY_URL")
-		self.model_name = Variable.get("MLFLOW_MODEL_NAME")
+		self.model_name = Variable.get("MLFLOW_MODEL_NAME", default_var="ArrivalDelayModel")
 
 		mlflow.set_tracking_uri(self.mlflow_uri)
-		mlflow.set_experiment(f"experiment_{self.model_name}")
+		mlflow.set_experiment(f"Experiment_{self.model_name}")
 
 		# --- Initialisation Prometheus ---
 		self.registry = CollectorRegistry()
-		
-		# Métriques de Dataset
-		self.metric_training_rows = Gauge(
-			'ml_training_rows_count', 
-			'Nombre de lignes utilisées pour l entraînement',
-			registry=self.registry
-		)
-		# Métriques de Performance
-		self.metric_r2_score = Gauge(
-			'ml_model_r2_score', 
-			'Score R2 du dernier modèle entraîné',
-			registry=self.registry
-		)
-		self.metric_mae = Gauge(
-			'ml_model_mae', 
-			'Mean Absolute Error du dernier modèle',
-			registry=self.registry
-		)
+		self.metric_training_rows = Gauge('ml_training_rows_count', 'Lignes utilisées', registry=self.registry)
+		self.metric_r2_score = Gauge('ml_model_r2_score', 'Score R2', registry=self.registry)
+		self.metric_mae = Gauge('ml_model_mae', 'MAE', registry=self.registry)
 
 	def _push_metrics(self):
-		"""Envoie les métriques au Pushgateway."""
 		try:
 			push_to_gateway(self.pushgateway_url, job='airflow_ml_client', registry=self.registry)
 		except Exception as e:
-			logging.warning(f"Prometheus push failed for MLClient: {e}")
+			logging.warning(f"Prometheus push failed: {e}")
 
 	def optimize_memory(self, df: pd.DataFrame) -> pd.DataFrame:
 		for col in df.columns:
@@ -72,94 +61,85 @@ class MLClient:
 			data_dynamic = res_dynamic.json().get("data", [])
 
 			if not data_live or not data_dynamic:
-				raise AirflowSkipException("Pas assez de données en base pour l'entraînement.")
+				raise AirflowSkipException("Données insuffisantes.")
 
-			df_live_history = pd.DataFrame(data_live)
-			df_dynamic_history = pd.DataFrame(data_dynamic)
+			df_live = pd.DataFrame(data_live)
+			df_dyn = pd.DataFrame(data_dynamic)
 
-			merge_cols = ["unique_key"]
-			target_cols = ["departure_difference", "arrival_difference"]
-			df_merged = df_live_history.merge(df_dynamic_history[merge_cols + target_cols], on="unique_key", how="left")
+			# Fusion stricte sur les cibles
+			df_merged = df_live.merge(df_dyn[["unique_key", "departure_difference", "arrival_difference"]], on="unique_key", how="left")
+			df_strict = df_merged.dropna(subset=["departure_difference", "arrival_difference"])
 
-			df_strict = df_merged.dropna(subset=["callsign", "icao24", "longitude", "latitude", "departure_difference", "arrival_difference"])
-
-			features = ["callsign", "icao24", "longitude", "latitude", "geo_altitude", "velocity", 
-						"global_condition", "departure_difference", "arrival_difference"]
-
+			features = ["callsign", "icao24", "longitude", "latitude", "geo_altitude", 
+						"velocity", "global_condition", "departure_difference", "arrival_difference"]
+			
 			df_features = df_strict[features].copy()
-
-			for col in ["geo_altitude", "velocity"]: df_features[col] = df_features[col].fillna(0)
-			df_features["global_condition"] = df_features["global_condition"].fillna("Unknown")
-
 			df_features = df_features[df_features["arrival_difference"].between(-60, 300)]
 			df_features = self.optimize_memory(df_features)
 
-			MAX_ROWS = 500000
-			
-			# Mise à jour de la métrique du nombre de lignes
 			row_count = len(df_features)
 			self.metric_training_rows.set(row_count)
-
-			if row_count > MAX_ROWS:
-				logging.warning(f"Dataset trop large ({row_count} lignes). Sampling à {MAX_ROWS}.")
-				df_features = df_features.sample(n = MAX_ROWS, random_state = 42)
-				self.metric_training_rows.set(MAX_ROWS)
-
 			self._push_metrics()
 
-			if len(df_features) < 10:
-				raise AirflowSkipException(f"Volume insuffisant : {len(df_features)} lignes.")
-
-			file_path = "/opt/airflow/data/processed_data.parquet"
-			df_features.to_parquet(file_path, engine = "pyarrow")
+			if row_count > 500000:
+				df_features = df_features.sample(n=500000, random_state=42)
 			
-			logging.info(f"Data saved to {file_path} (Rows: {len(df_features)})")
+			file_path = "/opt/airflow/data/processed_data.parquet"
+			df_features.to_parquet(file_path, engine="pyarrow")
 			return file_path
 		
-		except requests.RequestException as e:
-			logging.error(f"Erreur API : {e}")
+		except Exception as e:
+			logging.error(f"Erreur Preprocessing : {e}")
 			raise
 
 	def train_and_log_model(self, file_path: str):
 		data = pd.read_parquet(file_path)
 		TARGET = "arrival_difference"
 
-		X = data.drop(columns = [TARGET])
+		X = data.drop(columns=[TARGET])
 		y = data[TARGET]
 
+		# --- Pipeline de transformation (Embarquée pour la prod) ---
 		categorical_cols = ["callsign", "icao24", "global_condition"]
-		preprocessor = ColumnTransformer(
-			transformers = [
-				('cat', OrdinalEncoder(handle_unknown = "use_encoded_value", unknown_value = -1), categorical_cols)
-			], 
-			remainder = "passthrough"
-		)
+		numeric_cols = [c for c in X.columns if c not in categorical_cols]
 
-		X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 42)
+		numeric_transformer = Pipeline(steps=[
+			('imputer', SimpleImputer(strategy='constant', fill_value=0))
+		])
 
-		with mlflow.start_run(run_name = "Optimized model"):
+		categorical_transformer = Pipeline(steps=[
+			('imputer', SimpleImputer(strategy='constant', fill_value='Unknown')),
+			('encoder', OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1))
+		])
+
+		preprocessor = ColumnTransformer(transformers=[
+			('num', numeric_transformer, numeric_cols),
+			('cat', categorical_transformer, categorical_cols)
+		])
+
+		X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+		with mlflow.start_run(run_name="Champion-Challenger-Training"):
 			pipeline = Pipeline(steps=[
 				("preprocessor", preprocessor), 
-				("regressor", RandomForestRegressor(random_state = 42, n_jobs = -1))
+				("regressor", RandomForestRegressor(random_state=42, n_jobs=-1))
 			])            
 
 			param_grid = {
 				"regressor__n_estimators": [100],
 				"regressor__max_depth": [10, 15],
-				"regressor__min_samples_leaf": [5]
 			}
 			
-			grid_search = GridSearchCV(pipeline, param_grid, cv = 2, n_jobs = 1, scoring = "r2")
+			grid_search = GridSearchCV(pipeline, param_grid, cv=2, n_jobs=1, scoring="r2")
 			grid_search.fit(X_train, y_train)
-			
 			best_model = grid_search.best_estimator_
 
-			# Logging MLflow
+			# 1. Logging des paramètres et résumé
 			mlflow.log_params(grid_search.best_params_)
 			mlflow.log_dict(data.describe().to_dict(), "dataset_summary.json")
 
+			# 2. Métriques
 			y_pred = best_model.predict(X_test)
-
 			metrics = {
 				"MAE": mean_absolute_error(y_test, y_pred),
 				"RMSE": np.sqrt(mean_squared_error(y_test, y_pred)),
@@ -167,40 +147,67 @@ class MLClient:
 				"Max_Error": max_error(y_test, y_pred)
 			}
 			mlflow.log_metrics(metrics)
-
-			# --- Mise à jour Prometheus ---
+			
+			# Prometheus
 			self.metric_r2_score.set(metrics["R2_Score"])
 			self.metric_mae.set(metrics["MAE"])
 			self._push_metrics()
 
-			# (Le reste du code de logging d'artefacts et de modèle est identique...)
+			# 3. Graphiques
 			# Feature Importance
-			importances = best_model.named_steps['regressor'].feature_importances_
-			indices = np.argsort(importances)
-			plt.figure(figsize = (10, 8))
-			plt.barh(range(len(indices)), importances[indices], align = "center", color = 'skyblue')
-			plt.yticks(range(len(indices)), [X.columns[i] for i in indices])
-			plt.title("Feature Importance (Optimized)")
-			plt.savefig("feature_importance.png")
-			mlflow.log_artifact("feature_importance.png")
-			plt.close()
-
-			# Analyse des Résidus
-			plt.figure(figsize = (8, 6))
-			plt.scatter(y_pred, y_test - y_pred, alpha = 0.5)
-			plt.axhline(y = 0, color = 'r', linestyle = '--')
-			plt.title("Analyse des Résidus")
-			plt.savefig("residuals.png")
-			mlflow.log_artifact("residuals.png")
-			plt.close()
-
 			try:
-				mlflow.sklearn.log_model(
-					sk_model = best_model, 
-					name = "model",
-					registered_model_name = self.model_name
-				)
+				importances = best_model.named_steps['regressor'].feature_importances_
+				# On récupère les noms de colonnes après transformation
+				feat_names = numeric_cols + categorical_cols
+				indices = np.argsort(importances)
+				plt.figure(figsize=(10, 8))
+				plt.barh(range(len(indices)), importances[indices], align="center", color='skyblue')
+				plt.yticks(range(len(indices)), [feat_names[i] for i in indices])
+				plt.title("Feature Importance")
+				plt.savefig("feature_importance.png")
+				mlflow.log_artifact("feature_importance.png")
+				plt.close()
+
+				# Analyse des Résidus
+				plt.figure(figsize=(8, 6))
+				plt.scatter(y_pred, y_test - y_pred, alpha=0.3)
+				plt.axhline(y=0, color='r', linestyle='--')
+				plt.title("Analyse des Résidus")
+				plt.xlabel("Prédit")
+				plt.ylabel("Erreur (Réel - Prédit)")
+				plt.savefig("residuals.png")
+				mlflow.log_artifact("residuals.png")
+				plt.close()
 			except Exception as e:
-				logging.error(f"Erreur lors du log du modèle : {e}")
+				logging.warning(f"Erreur lors de la génération des graphiques : {e}")
+
+			# 4. Sauvegarde et Enregistrement
+			mlflow.sklearn.log_model(
+				sk_model=best_model, 
+				artifact_path="model",
+				registered_model_name=self.model_name
+			)
+
+			# 5. Logique de Promotion (Champion vs Challenger)
+			client = MlflowClient()
+			new_r2 = metrics["R2_Score"]
+			try:
+				prod_ver = client.get_model_version_by_alias(self.model_name, "production")
+				prod_run = client.get_run(prod_ver.run_id)
+				prod_r2 = float(prod_run.data.metrics.get("R2_Score", -1))
+
+				logging.info(f"Challenge: New R2 {new_r2:.4f} vs Prod R2 {prod_r2:.4f}")
+
+				if new_r2 > prod_r2:
+					logging.info("--- NOUVEAU CHAMPION PROMOTE EN PRODUCTION ---")
+					latest_v = client.get_registered_model(self.model_name).latest_versions[0].version
+					client.set_registered_model_alias(self.model_name, "production", latest_v)
+				else:
+					logging.info("Le Challenger a échoué. La production reste inchangée.")
+
+			except Exception:
+				logging.info("Aucun champion en titre. Promotion automatique de la Version 1.")
+				latest_v = client.get_registered_model(self.model_name).latest_versions[0].version
+				client.set_registered_model_alias(self.model_name, "production", latest_v)
 
 			return {**metrics, "rows": int(len(data))}
