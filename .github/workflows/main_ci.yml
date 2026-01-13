@@ -36,39 +36,62 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest httpx
+          pip install pytest httpx pandas numpy
           if [ -f api/requirements.txt ]; then pip install -r api/requirements.txt; fi
 
       - name: Setup Test DB Tables & Data
         env:
           PGPASSWORD: password_test
         run: |
-          # 1. Création de la structure cohérente avec le seed
+          # 1. Création de la structure cohérente avec le seed via psql -c
           psql -h localhost -U user_test -d db_test -c "
           CREATE TABLE IF NOT EXISTS flight_static (
-              callsign VARCHAR(10) PRIMARY KEY, 
-              airline_name VARCHAR(100), 
-              origin_code VARCHAR(3), 
-              destination_code VARCHAR(3), 
+              callsign VARCHAR(10) PRIMARY KEY,
+              airline_name VARCHAR(100),
+              origin_code VARCHAR(3),
+              destination_code VARCHAR(3),
               commercial_flight BOOLEAN
           );
+
           CREATE TABLE IF NOT EXISTS flight_dynamic (
-              unique_key TEXT PRIMARY KEY,
-              callsign VARCHAR(10) NOT NULL, 
-              icao24 VARCHAR(10) NOT NULL, 
-              flight_date DATE,
-              departure_scheduled TIME,
-              status VARCHAR(15),
-              last_update TIMESTAMPTZ
+              callsign VARCHAR(10) NOT NULL,
+              icao24 VARCHAR(10) NOT NULL,
+              flight_date DATE NOT NULL,
+              departure_scheduled TIME NOT NULL,
+              departure_actual TIME,
+              arrival_scheduled TIME,
+              arrival_actual TIME,
+              status VARCHAR(15) NOT NULL,
+              last_update TIMESTAMPTZ DEFAULT NOW(),
+              unique_key TEXT NOT NULL,
+              CONSTRAINT pk_flight_dynamic PRIMARY KEY (unique_key)
           );
+
           CREATE TABLE IF NOT EXISTS live_data (
-              request_id UUID NOT NULL, 
-              callsign VARCHAR(10), 
-              icao24 VARCHAR(10), 
-              unique_key TEXT REFERENCES flight_dynamic(unique_key), 
-              longitude DOUBLE PRECISION, 
+              indice SERIAL,
+              request_id UUID NOT NULL,
+              callsign VARCHAR(10) NOT NULL,
+              icao24 VARCHAR(10) NOT NULL,
+              flight_date DATE NOT NULL,
+              departure_scheduled TIME NOT NULL,
+              longitude DOUBLE PRECISION,
               latitude DOUBLE PRECISION,
-              CONSTRAINT pk_live_data PRIMARY KEY (request_id, unique_key)
+              baro_altitude DOUBLE PRECISION,
+              geo_altitude DOUBLE PRECISION, 
+              on_ground BOOLEAN,
+              velocity DOUBLE PRECISION,
+              vertical_rate DOUBLE PRECISION,
+              temperature DOUBLE PRECISION,
+              wind_speed DOUBLE PRECISION,
+              gust_speed DOUBLE PRECISION,
+              visibility DOUBLE PRECISION,
+              cloud_coverage DOUBLE PRECISION,
+              rain DOUBLE PRECISION,
+              global_condition VARCHAR(100),
+              unique_key TEXT NOT NULL,
+              CONSTRAINT pk_live_data PRIMARY KEY (request_id, unique_key),
+              CONSTRAINT fk_live_dynamic FOREIGN KEY(unique_key) 
+                  REFERENCES flight_dynamic(unique_key)
           );
           "
           # 2. Injection des données réelles (seed_data.sql)
