@@ -15,9 +15,7 @@ def get_datasets():
 
 def get_static_flight(callsign: str):
 	sql = """
-		SELECT callsign, airline_name, origin_code, origin_airport,
-			   destination_code, destination_airport,
-			   origin_city, destination_city, commercial_flight
+		SELECT *
 		FROM flight_static
 		WHERE callsign = %s
 	"""
@@ -41,7 +39,7 @@ def get_merged_flight(callsign: str):
 	# --- STATIC ---
 	static_data = get_static_flight(callsign)
 	if not static_data:
-		raise HTTPException(status_code=404, detail="Callsign not found")
+		raise HTTPException(status_code = 404, detail = "Callsign not found")
 
 	# --- DATASETS ---
 	datasets = get_datasets()
@@ -65,8 +63,6 @@ def get_merged_flight(callsign: str):
 			"arrival_actual_ts": flight.get("arrival_actual_ts"),
 			"departure_difference": flight.get("departure_difference"),
 			"arrival_difference": flight.get("arrival_difference"),
-			"departure_status": flight.get("departure_status"),
-			"arrival_status": flight.get("arrival_status"),
 			"last_update": flight.get("last_update"),
 			"live_data": live_rows
 		})
@@ -88,8 +84,6 @@ def get_merged_flight(callsign: str):
 			"arrival_actual_ts": flight.get("arrival_actual_ts"),
 			"departure_difference": flight.get("departure_difference"),
 			"arrival_difference": flight.get("arrival_difference"),
-			"departure_status": flight.get("departure_status"),
-			"arrival_status": flight.get("arrival_status"),
 			"last_update": flight.get("last_update"),
 			"live_data": live_rows
 		})
@@ -101,12 +95,7 @@ def get_merged_flight(callsign: str):
 		"callsign": callsign,
 		"airline_name": static_data.get("airline_name"),
 		"origin_code": static_data.get("origin_code"),
-		"origin_airport": static_data.get("origin_airport"),
 		"destination_code": static_data.get("destination_code"),
-		"destination_airport": static_data.get("destination_airport"),
-		"origin_city": static_data.get("origin_city"),
-		"destination_city": static_data.get("destination_city"),
-		"commercial_flight": static_data.get("commercial_flight"),
 		"history": history,
 		"live": live
 	}
