@@ -10,8 +10,7 @@ router = APIRouter(tags=["Static metadatas"])
 def get_current_subset():
 	sql = "SELECT * FROM flight_dynamic ORDER BY last_update DESC"
 	all_flights = pd.DataFrame(db.query(sql))
-	# datasets = flight_features.build_flight_datasets(all_flights)
-	datasets = build_flight_datasets(all_flights)
+	datasets = flight_features.build_flight_datasets(all_flights)
 	return datasets["current"]
 
 
@@ -20,7 +19,6 @@ def get_static_flights(
 	origin_code: Optional[str] = None,
 	destination_code: Optional[str] = None,
 	airline_name: Optional[str] = None,
-	limit: int = Query(100, ge=1, le=1000)
 ):
 	# --- récupérer les callsigns en cours ---
 	current_rows = get_current_subset()
@@ -38,10 +36,6 @@ def get_static_flights(
 			airline_name,
 			origin_code,
 			destination_code,
-			origin_airport,
-			destination_airport,
-			origin_city,
-			destination_city,
 			commercial_flight
 		FROM flight_static
 		WHERE callsign IN ({in_placeholders})
@@ -60,16 +54,15 @@ def get_static_flights(
 		params.append(destination_code)
 
 	if airline_name:
-		sql += " AND airline_name = %s"
-		params.append(airline_name)
+		sql += " AND airline_name ILIKE %s"
+		params.append(f"%{airline_name}%")
 
 	# --- tri & limite ---
-	sql += " ORDER BY callsign LIMIT %s"
-	params.append(limit)
+	sql += " ORDER BY callsign"
 
 	rows = db.query(sql, tuple(params))
 
-	DB_RECORDS_PROCESSED.labels(table_name="flight_static").inc(len(rows))
+	DB_RECORDS_PROCESSED.labels(table_name = "flight_static").inc(len(rows))
 
 	return {
 		"count": len(rows),
