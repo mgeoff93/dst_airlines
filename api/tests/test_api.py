@@ -16,6 +16,10 @@ def test_healthcheck():
 
 def test_prometheus_metrics():
 	"""Vérifie l'exposition des métriques (Prometheus)"""
+	# 1. On effectue d'abord un appel métier pour "réveiller" les compteurs
+	client.get("/static?limit=1") 
+	
+	# 2. Maintenant on vérifie les métriques
 	response = client.get("/metrics")
 	assert response.status_code == 200
 	assert "db_records_processed_total" in response.text
