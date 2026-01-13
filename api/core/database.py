@@ -2,7 +2,7 @@ import logging
 from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
 from contextlib import contextmanager
-from api.core.config import POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD
+from api.core.config import POSTGRES_HOST, POSTGRES_PORT, AIRLINES_POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD
 
 logging.basicConfig(level = logging.INFO)
 
@@ -17,7 +17,7 @@ class PostgresClient:
 				maxconn=10,
 				host=POSTGRES_HOST,
 				port=POSTGRES_PORT,
-				database=POSTGRES_DB,
+				database=AIRLINES_POSTGRES_DB,
 				user=POSTGRES_USER,
 				password=POSTGRES_PASSWORD
 			)

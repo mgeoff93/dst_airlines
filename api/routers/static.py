@@ -10,7 +10,8 @@ router = APIRouter(tags=["Static metadatas"])
 def get_current_subset():
 	sql = "SELECT * FROM flight_dynamic ORDER BY last_update DESC"
 	all_flights = pd.DataFrame(db.query(sql))
-	datasets = flight_features.build_flight_datasets(all_flights)
+	# datasets = flight_features.build_flight_datasets(all_flights)
+	datasets = build_flight_datasets(all_flights)
 	return datasets["current"]
 
 
@@ -30,7 +31,7 @@ def get_static_flights(
 
 	# --- construction du IN (%s, %s, ...) ---
 	in_placeholders = ",".join(["%s"] * len(current_callsigns))
-
+	
 	sql = f"""
 		SELECT
 			callsign,

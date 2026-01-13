@@ -71,7 +71,7 @@ services:
       POSTGRES_DB: ${AIRFLOW_POSTGRES_DB}
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
-      - ./airflow/config/init_airlines.sql:/docker-entrypoint-initdb.d/init_airlines.sql
+      - ./airflow/config:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}"]
       interval: 10s
@@ -108,7 +108,6 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - MLFLOW_HTTP_HOST=0.0.0.0
       - MLFLOW_BACKEND_STORE_URI=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/mlflow
       - MLFLOW_ARTIFACT_ROOT=/mlflow/artifacts
     volumes:
@@ -120,6 +119,12 @@ services:
       --backend-store-uri postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/mlflow
       --default-artifact-root /mlflow/artifacts
       --host 0.0.0.0
+      --port 5000
+      --allowed-hosts "*"
+      --cors-allowed-origins "*"
+    depends_on:
+        postgres:
+          condition: service_healthy
     restart: always
 
   airflow-apiserver:
@@ -196,14 +201,16 @@ services:
       context: .
       dockerfile: api/Dockerfile
     container_name: api
+    volumes:
+      - ./api:/app/api
     ports:
       - "8000:8000"
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: ${POSTGRES_PORT}
-      AIRLINES_POSTGRES_DB: ${AIRLINES_POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      AIRLINES_POSTGRES_DB: ${AIRLINES_POSTGRES_DB}
     networks:
       - airflow_network
     restart: always
@@ -253,6 +260,7 @@ services:
       - pushgateway
       - cadvisor
       - postgres-exporter
+    restart: always
 
   grafana:
     image: grafana/grafana:latest
@@ -263,6 +271,7 @@ services:
       - airflow_network
     depends_on:
       - prometheus
+    restart: always
 
   init-permissions:
     image: alpine
