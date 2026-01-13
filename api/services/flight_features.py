@@ -4,7 +4,8 @@ from api.core.config import STALE_THRESHOLD
 
 def dataframe_to_list_of_dicts(df: pd.DataFrame) -> list:
 	# On remplace les types numériques NaN et les objets NaT par None pour le JSON
-	return df.where(pd.notna(df), None).to_dict(orient="records")
+	# return df.where(pd.notna(df), None).to_dict(orient="records")
+	return df.replace({np.nan: None}).where(pd.notna(df), None).to_dict(orient="records")
 
 def build_flight_datasets(all_flights: pd.DataFrame) -> dict:
 	df = all_flights.copy()

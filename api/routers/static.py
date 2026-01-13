@@ -46,11 +46,11 @@ def get_static_flights(
 
 	# --- filtres optionnels ---
 	if origin_code:
-		sql += " AND origin_code = %s"
+		sql += " AND origin_code ILIKE %s"
 		params.append(origin_code)
 
 	if destination_code:
-		sql += " AND destination_code = %s"
+		sql += " AND destination_code ILIKE %s"
 		params.append(destination_code)
 
 	if airline_name:
