@@ -2,21 +2,6 @@ import pandas as pd
 import numpy as np
 from api.core.config import STALE_THRESHOLD
 
-def categorize_delay(x):
-	"""
-	Catégorise le retard :
-	- "late" si > 10 min
-	- "early" si < -10 min
-	- "on time" sinon
-	"""
-	if pd.isna(x):
-		return None
-	if x > 10:
-		return "late"
-	elif x < -10:
-		return "early"
-	return "on time"
-
 def dataframe_to_list_of_dicts(df: pd.DataFrame) -> list:
 	# On remplace les types numériques NaN et les objets NaT par None pour le JSON
 	return df.where(pd.notna(df), None).to_dict(orient="records")
@@ -46,15 +31,12 @@ def build_flight_datasets(all_flights: pd.DataFrame) -> dict:
 	# --- 3. Calculs des différences et Statuts ---
 	df["departure_difference"] = (df["departure_actual_ts"] - df["departure_scheduled_ts"]).dt.total_seconds() / 60
 	df["arrival_difference"] = (df["arrival_actual_ts"] - df["arrival_scheduled_ts"]).dt.total_seconds() / 60
-	df["departure_status"] = df["departure_difference"].apply(categorize_delay)
-	df["arrival_status"] = df["arrival_difference"].apply(categorize_delay)
 	# --- 4. Sélection et Nettoyage final ---
 	cols_to_keep = [
 		"unique_key", "callsign", "icao24", "status",
 		"departure_scheduled_ts", "departure_actual_ts",
 		"arrival_scheduled_ts", "arrival_actual_ts",
 		"departure_difference", "arrival_difference",
-		"departure_status", "arrival_status",
 		"last_update"
 	]
 	normalized = df[cols_to_keep].copy()
@@ -62,7 +44,7 @@ def build_flight_datasets(all_flights: pd.DataFrame) -> dict:
 	# Dataset des vols terminés
 	done = normalized[
 		(normalized["status"] == "arrived") & 
-		(normalized["arrival_status"].notna())
+		(normalized["arrival_difference"].notna())
 	].copy()
 	# Dataset des vols en cours
 	now = pd.Timestamp.utcnow().replace(tzinfo=None)
