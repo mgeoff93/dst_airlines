@@ -22,13 +22,14 @@ def get_datasets():
 @router.get("/dynamic")
 def get_dynamic_flights(
 	timeline: FlightStatus = Query(FlightStatus.all),
-	callsign: Optional[str] = None
+	callsign: Optional[str] = None,
+	limit: Optional[int] = Query(None, ge=1) # 1. Ajout de la limite optionnelle
 ):
 	datasets = get_datasets()
 	total_loaded = len(datasets["current"]) + len(datasets["done"])
 	DB_RECORDS_PROCESSED.labels(table_name = "flight_dynamic").inc(total_loaded)
 	
-	# 3. Sélection du dataset (status est maintenant un objet Enum, on utilise .value)
+	# 3. Sélection du dataset
 	if timeline == FlightStatus.live:
 		rows = datasets["current"]
 	elif timeline == FlightStatus.history:
@@ -40,13 +41,16 @@ def get_dynamic_flights(
 	if callsign:
 		rows = [r for r in rows if r.get("callsign") == callsign]
 
-	# --- tri cohérent (Correction du crash potentiel sur last_update) ---
-	# On utilise une valeur par défaut très ancienne si last_update est None
+	# --- tri cohérent ---
 	rows = sorted(
 		rows, 
 		key=lambda r: r.get("last_update") if r.get("last_update") is not None else pd.Timestamp.min, 
 		reverse=True
 	)
+
+	# --- 2. Application de la limite (Slicing Python) ---
+	if limit is not None:
+		rows = rows[:limit]
 
 	return {
 		"count": len(rows),
