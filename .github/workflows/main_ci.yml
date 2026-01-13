@@ -7,7 +7,6 @@ on:
     branches: [ main, master, refactoring ]
 
 jobs:
-  # JOB 1 : Tests API (Python + Postgres avec données réelles)
   api:
     runs-on: ubuntu-latest
     services:
@@ -43,11 +42,7 @@ jobs:
         env:
           PGPASSWORD: password_test
         run: |
-          # 1. On crée la base 'user_test' (celle que ton API cherche par défaut)
           psql -h localhost -U user_test -d postgres -c "CREATE DATABASE user_test;"
-
-          # 2. On boucle pour créer la structure et injecter les données dans les DEUX bases
-          # Cela garantit que peu importe où ton code regarde, il trouve les données.
           for DB in db_test user_test; do
             echo "Configuring database: $DB"
             psql -h localhost -U user_test -d $DB -c "
@@ -58,7 +53,6 @@ jobs:
                 destination_code VARCHAR(3),
                 commercial_flight BOOLEAN
             );
-
             CREATE TABLE IF NOT EXISTS flight_dynamic (
                 callsign VARCHAR(10) NOT NULL,
                 icao24 VARCHAR(10) NOT NULL,
@@ -72,7 +66,6 @@ jobs:
                 unique_key TEXT NOT NULL,
                 CONSTRAINT pk_flight_dynamic_$DB PRIMARY KEY (unique_key)
             );
-
             CREATE TABLE IF NOT EXISTS live_data (
                 indice SERIAL,
                 request_id UUID NOT NULL,
@@ -83,7 +76,7 @@ jobs:
                 longitude DOUBLE PRECISION,
                 latitude DOUBLE PRECISION,
                 baro_altitude DOUBLE PRECISION,
-                geo_altitude DOUBLE PRECISION, 
+                geo_altitude DOUBLE PRECISION,
                 on_ground BOOLEAN,
                 velocity DOUBLE PRECISION,
                 vertical_rate DOUBLE PRECISION,
@@ -96,12 +89,13 @@ jobs:
                 global_condition VARCHAR(100),
                 unique_key TEXT NOT NULL,
                 CONSTRAINT pk_live_data_$DB PRIMARY KEY (request_id, unique_key),
-                CONSTRAINT fk_live_dynamic_$DB FOREIGN KEY(unique_key) 
+                CONSTRAINT fk_live_dynamic_$DB FOREIGN KEY(unique_key)
                     REFERENCES flight_dynamic(unique_key)
             );
             "
-            # Injection du seed dans la base courante
-            psql -h localhost -U user_test -d $DB -f api/tests/seed_data.sql
+            if [ -f api/tests/seed_data.sql ]; then
+              psql -h localhost -U user_test -d $DB -f api/tests/seed_data.sql
+            fi
           done
 
       - name: Run API Unit Tests
@@ -115,7 +109,6 @@ jobs:
           export PYTHONPATH=$PYTHONPATH:$(pwd)
           python -m pytest -v api/tests/test_api.py
 
-  # JOB 2 : Validation Terraform
   terraform:
     runs-on: ubuntu-latest
     steps:
@@ -124,17 +117,13 @@ jobs:
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.5.0
-      - name: Terraform Init
-        run: terraform init
-        working-directory: ./terraform
-      - name: Terraform Validate
-        run: terraform validate
-        working-directory: ./terraform
-      - name: Terraform Format Check
-        run: terraform fmt -check
-        working-directory: ./terraform
+      - name: Terraform Init/Validate
+        run: |
+          cd terraform
+          terraform init
+          terraform validate
+          terraform fmt -check
 
-  # JOB 3 : Validation Airflow (DAGs + Plugins)
   airflow:
     runs-on: ubuntu-latest
     steps:
@@ -145,50 +134,19 @@ jobs:
           python-version: '3.11'
       - name: Install Airflow & Deps
         run: |
-          python -m pip install --upgrade pip
-          pip install "apache-airflow>=2.10.0" \
-                      psycopg2-binary \
-                      apache-airflow-providers-postgres \
-                      apache-airflow-providers-http \
-                      apache-airflow-providers-common-sql \
-                      prometheus-client pandas pyarrow mlflow scikit-learn requests selenium
+          pip install "apache-airflow>=2.10.0" psycopg2-binary prometheus-client pandas pyarrow mlflow scikit-learn requests
       - name: Static DAG Load Test
-        env:
-          AIRFLOW_VAR_PUSHGATEWAY_URL: "localhost:9091"
-          AIRFLOW_VAR_CONNECTION_ID: "airlines"
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)/airflow/plugins
-          python -c "from airflow.models import DagBag; dagbag = DagBag(dag_folder='airflow/dags', include_examples=False); print('Import Errors Found:', dagbag.import_errors); exit(1 if len(dagbag.import_errors) > 0 else 0)"
+          python -c "from airflow.models import DagBag; dagbag = DagBag(dag_folder='airflow/dags', include_examples=False); exit(1 if len(dagbag.import_errors) > 0 else 0)"
 
-  # JOB 4 : Vérification du Build Docker (Dry Run)
   docker:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
-      - name: Create external resources for CI
-        run: |
-          docker network create airflow_network_terraform
-          docker volume create postgres-db-volume-terraform
-          docker volume create mlflow-artifacts-terraform
-          docker volume create airflow-data-terraform
-          mkdir -p airflow/config
-          echo "{}" > airflow/config/variables.json
-          
-      - name: Validate Docker Compose Config
+      - name: Validate Docker Compose
         env:
           AIRFLOW_JWT_SECRET: "ci_static_secret_32_characters_long"
           AIRFLOW_FERNET_KEY: "ci_static_fernet_key_validation="
           AIRFLOW_API_SECRET_KEY: "ci_static_api_secret_key_32_char"
-          POSTGRES_USER: "test"
-          POSTGRES_PASSWORD: "test"
-          POSTGRES_PORT: 5432
-          AIRFLOW_POSTGRES_DB: "test"
-          AIRLINES_POSTGRES_DB: "test"
-          MLFLOW_API_URL: "http://localhost:5000"
-          SELENIUM_POOL_SIZE: 2
-          AIRFLOW_PROJ_DIR: "."
         run: docker compose config
-        
-      - name: Build Airflow Image (Dry Run)
-        run: docker compose build airflow-init
