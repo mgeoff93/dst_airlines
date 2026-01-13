@@ -130,6 +130,11 @@ variable "MLFLOW_API_URL" {
   default = "http://mlflow:5000"
 }
 
+variable "MODEL_NAME" {
+  type    = string
+  default = "ArrivalDelayModel"
+}
+
 variable "AIRFLOW_PROJ_DIR" {
   type    = string
   default = "."

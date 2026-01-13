@@ -1,0 +1,199 @@
+{
+  "version": 4,
+  "terraform_version": "1.14.3",
+  "serial": 12,
+  "lineage": "050d0ab8-e22e-4801-07a8-692ca344e026",
+  "outputs": {},
+  "resources": [
+    {
+      "mode": "managed",
+      "type": "docker_network",
+      "name": "airflow_network",
+      "provider": "provider[\"registry.terraform.io/kreuzwerker/docker\"]",
+      "instances": [
+        {
+          "schema_version": 1,
+          "attributes": {
+            "attachable": false,
+            "check_duplicate": true,
+            "driver": "bridge",
+            "id": "ec8121273501757917eb27340c5023feebb576bb23c87024f7450bed0ff17222",
+            "ingress": false,
+            "internal": false,
+            "ipam_config": [
+              {
+                "aux_address": {},
+                "gateway": "172.18.0.1",
+                "ip_range": "",
+                "subnet": "172.18.0.0/16"
+              }
+            ],
+            "ipam_driver": "default",
+            "ipam_options": {},
+            "ipv6": false,
+            "labels": [],
+            "name": "airflow_network_terraform",
+            "options": {
+              "com.docker.network.enable_ipv4": "true"
+            },
+            "scope": "local"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJzY2hlbWFfdmVyc2lvbiI6IjEifQ=="
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "docker_volume",
+      "name": "airflow_data",
+      "provider": "provider[\"registry.terraform.io/kreuzwerker/docker\"]",
+      "instances": [
+        {
+          "schema_version": 1,
+          "attributes": {
+            "driver": "local",
+            "driver_opts": {},
+            "id": "airflow-data-terraform",
+            "labels": [],
+            "mountpoint": "/var/lib/docker/volumes/airflow-data-terraform/_data",
+            "name": "airflow-data-terraform"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJzY2hlbWFfdmVyc2lvbiI6IjEifQ=="
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "docker_volume",
+      "name": "mlflow_artifacts",
+      "provider": "provider[\"registry.terraform.io/kreuzwerker/docker\"]",
+      "instances": [
+        {
+          "schema_version": 1,
+          "attributes": {
+            "driver": "local",
+            "driver_opts": {},
+            "id": "mlflow-artifacts-terraform",
+            "labels": [],
+            "mountpoint": "/var/lib/docker/volumes/mlflow-artifacts-terraform/_data",
+            "name": "mlflow-artifacts-terraform"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJzY2hlbWFfdmVyc2lvbiI6IjEifQ=="
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "docker_volume",
+      "name": "postgres_data",
+      "provider": "provider[\"registry.terraform.io/kreuzwerker/docker\"]",
+      "instances": [
+        {
+          "schema_version": 1,
+          "attributes": {
+            "driver": "local",
+            "driver_opts": {},
+            "id": "postgres-db-volume-terraform",
+            "labels": [],
+            "mountpoint": "/var/lib/docker/volumes/postgres-db-volume-terraform/_data",
+            "name": "postgres-db-volume-terraform"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJzY2hlbWFfdmVyc2lvbiI6IjEifQ=="
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "local_file",
+      "name": "airflow_variables",
+      "provider": "provider[\"registry.terraform.io/hashicorp/local\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "content": "{\"AIRFLOW_API_URL\":\"http://api:8000\",\"CONNECTION_ID\":\"airlines\",\"FLIGHTAWARE_BASE_URL\":\"https://fr.flightaware.com/live/flight\",\"MLFLOW_API_URL\":\"http://mlflow:5000\",\"OPENSKY_API_URL\":\"https://opensky-network.org/api/states/all\",\"OPENSKY_PASSWORD\":\"MRekHJjkss0MYXYx70nSFEENfu4lDiYE\",\"OPENSKY_TOKEN\":\"\",\"OPENSKY_TOKEN_URL\":\"https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token\",\"OPENSKY_USERNAME\":\"datascientest_airlines-api-client\",\"PUSHGATEWAY_URL\":\"pushgateway:9091\",\"SELENIUM_REMOTE_URL\":\"http://selenium:4444/wd/hub\",\"SELENIUM_WAIT_TIME\":10,\"WEATHER_API_KEY\":\"9748e82a101044a2832115118252611\",\"WEATHER_API_URL\":\"https://api.weatherapi.com/v1/current.json\",\"WEATHER_FIELDS\":[\"temperature\",\"wind_speed\",\"gust_speed\",\"visibility\",\"cloud_coverage\",\"rain\",\"global_condition\"],\"WEATHER_TIMEOUT\":10}",
+            "content_base64": null,
+            "content_base64sha256": "mDjWJ9Ryrt4Zynyxi7NBi/rexKhDtOnLAdWIA2ltAI4=",
+            "content_base64sha512": "Mjbwg4cAWfMVLWrKW6qiVh36x7TCfDVv9xDT6HPhue9I3Ssj91li7focqpLXXLZ7lHuVlVqe9yBMKA4fBvS9GQ==",
+            "content_md5": "eab3d6b9baaa7794e2917b05499fb2dc",
+            "content_sha1": "14202eb95fa3e54ba1dc9dbe2cc7f21f6f450cbc",
+            "content_sha256": "9838d627d472aede19ca7cb18bb3418bfadec4a843b4e9cb01d58803696d008e",
+            "content_sha512": "3236f083870059f3152d6aca5baaa2561dfac7b4c27c356ff710d3e873e1b9ef48dd2b23f75962edfa1caa92d75cb67b947b95955a9ef7204c280e1f06f4bd19",
+            "directory_permission": "0777",
+            "file_permission": "0777",
+            "filename": "./../airflow/config/variables.json",
+            "id": "14202eb95fa3e54ba1dc9dbe2cc7f21f6f450cbc",
+            "sensitive_content": null,
+            "source": null
+          },
+          "sensitive_attributes": [
+            [
+              {
+                "type": "get_attr",
+                "value": "content"
+              }
+            ],
+            [
+              {
+                "type": "get_attr",
+                "value": "sensitive_content"
+              }
+            ]
+          ],
+          "identity_schema_version": 0
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "local_file",
+      "name": "docker_env",
+      "provider": "provider[\"registry.terraform.io/hashicorp/local\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "content": "POSTGRES_USER=airflow\r\nPOSTGRES_PASSWORD=airflow\r\nPOSTGRES_PORT=5432\r\nAIRFLOW_POSTGRES_DB=airflow\r\nSELENIUM_POOL_SIZE=4\r\nAIRLINES_POSTGRES_DB=airlines\r\nMLFLOW_API_URL=http://mlflow:5000\r\nAIRFLOW_FERNET_KEY=Ubeq88NwagEmNSgDMU3e8jOAG_sNeFpb7cRdxbcxuZQ=\r\nAIRFLOW_JWT_SECRET=02718b539712bb5734f2201ba4d4423cc655e64b0b57b266eaa59c14d4cd5a1c\r\nAIRFLOW_API_SECRET_KEY=ed01e0efcf47b5147dd946c08565d945d91cb9b12171f1a7cbffd8a84d483591\r\nAIRFLOW_PROJ_DIR=.\r\nAIRFLOW_UID=50000\r\n",
+            "content_base64": null,
+            "content_base64sha256": "3qx9D+6asJWta9rnSx+gwHm8aNJE5oIUeks1o6xVjXo=",
+            "content_base64sha512": "/q+jdvnKkxMYdvbqhXzBqlEiklkiq0vSVAWgXx02e0urBieT3zxpLUxNDBzUlNLfcQp+xydGJQrbO2CxKoj70Q==",
+            "content_md5": "26d821ce29551b59bb9d44a8a754abe0",
+            "content_sha1": "a052af6306816dd74195ae48a5f3fb62514aa26c",
+            "content_sha256": "deac7d0fee9ab095ad6bdae74b1fa0c079bc68d244e682147a4b35a3ac558d7a",
+            "content_sha512": "feafa376f9ca93131876f6ea857cc1aa5122925922ab4bd25405a05f1d367b4bab062793df3c692d4c4d0c1cd494d2df710a7ec72746250adb3b60b12a88fbd1",
+            "directory_permission": "0777",
+            "file_permission": "0777",
+            "filename": "./../.env",
+            "id": "a052af6306816dd74195ae48a5f3fb62514aa26c",
+            "sensitive_content": null,
+            "source": null
+          },
+          "sensitive_attributes": [
+            [
+              {
+                "type": "get_attr",
+                "value": "content"
+              }
+            ],
+            [
+              {
+                "type": "get_attr",
+                "value": "sensitive_content"
+              }
+            ]
+          ],
+          "identity_schema_version": 0
+        }
+      ]
+    }
+  ],
+  "check_results": null
+}

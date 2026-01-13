@@ -203,6 +203,7 @@ services:
     container_name: api
     volumes:
       - ./api:/app/api
+      - mlflow_artifacts:/mlflow/artifacts
     ports:
       - "8000:8000"
     environment:
@@ -211,6 +212,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       AIRLINES_POSTGRES_DB: ${AIRLINES_POSTGRES_DB}
+      MLFLOW_API_URL: ${MLFLOW_API_URL}
+      MODEL_NAME: ${MODEL_NAME}
     networks:
       - airflow_network
     restart: always
@@ -275,6 +278,9 @@ services:
 
   init-permissions:
     image: alpine
+    user: "0:0"
     volumes:
-      - ./data:/data
-    command: chmod -R 777 /data
+      - mlflow_artifacts:/mlflow/artifacts
+      - ./airflow/data:/airflow_data
+    command: >
+      sh -c "chmod -R 777 /mlflow/artifacts && chmod -R 777 /airflow_data"

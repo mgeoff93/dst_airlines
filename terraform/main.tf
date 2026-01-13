@@ -31,6 +31,7 @@ resource "local_file" "airflow_variables" {
     "CONNECTION_ID"        = var.CONNECTION_ID
     "MLFLOW_API_URL"       = var.MLFLOW_API_URL
     "AIRFLOW_API_URL"      = var.AIRFLOW_API_URL
+    "MLFLOW_MODEL_NAME"    = var.MODEL_NAME
   })
 }
 
@@ -50,6 +51,7 @@ resource "local_file" "docker_env" {
     AIRFLOW_API_SECRET_KEY=${var.AIRFLOW_API_SECRET_KEY}
     AIRFLOW_PROJ_DIR=${var.AIRFLOW_PROJ_DIR}
     AIRFLOW_UID=${var.AIRFLOW_UID}
+    MODEL_NAME=${var.MODEL_NAME}
   EOT
 }
 

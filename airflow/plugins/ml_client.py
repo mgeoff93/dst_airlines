@@ -24,9 +24,10 @@ class MLClient:
 		self.api_url =  Variable.get("AIRFLOW_API_URL")
 		self.mlflow_uri = Variable.get("MLFLOW_API_URL")
 		self.pushgateway_url = Variable.get("PUSHGATEWAY_URL")
-		
+		self.model_name = Variable.get("MLFLOW_MODEL_NAME")
+
 		mlflow.set_tracking_uri(self.mlflow_uri)
-		mlflow.set_experiment("model_arrival_difference")
+		mlflow.set_experiment(f"experiment_{self.model_name}")
 
 		# --- Initialisation Prometheus ---
 		self.registry = CollectorRegistry()
@@ -197,7 +198,7 @@ class MLClient:
 				mlflow.sklearn.log_model(
 					sk_model = best_model, 
 					name = "model",
-					registered_model_name = "ArrivalDelayModel"
+					registered_model_name = self.model_name
 				)
 			except Exception as e:
 				logging.error(f"Erreur lors du log du modèle : {e}")
