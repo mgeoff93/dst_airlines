@@ -43,59 +43,66 @@ jobs:
         env:
           PGPASSWORD: password_test
         run: |
-          # 1. Création de la structure cohérente avec le seed via psql -c
-          psql -h localhost -U user_test -d db_test -c "
-          CREATE TABLE IF NOT EXISTS flight_static (
-              callsign VARCHAR(10) PRIMARY KEY,
-              airline_name VARCHAR(100),
-              origin_code VARCHAR(3),
-              destination_code VARCHAR(3),
-              commercial_flight BOOLEAN
-          );
+          # 1. On crée la base 'user_test' (celle que ton API cherche par défaut)
+          psql -h localhost -U user_test -d postgres -c "CREATE DATABASE user_test;"
 
-          CREATE TABLE IF NOT EXISTS flight_dynamic (
-              callsign VARCHAR(10) NOT NULL,
-              icao24 VARCHAR(10) NOT NULL,
-              flight_date DATE NOT NULL,
-              departure_scheduled TIME NOT NULL,
-              departure_actual TIME,
-              arrival_scheduled TIME,
-              arrival_actual TIME,
-              status VARCHAR(15) NOT NULL,
-              last_update TIMESTAMPTZ DEFAULT NOW(),
-              unique_key TEXT NOT NULL,
-              CONSTRAINT pk_flight_dynamic PRIMARY KEY (unique_key)
-          );
+          # 2. On boucle pour créer la structure et injecter les données dans les DEUX bases
+          # Cela garantit que peu importe où ton code regarde, il trouve les données.
+          for DB in db_test user_test; do
+            echo "Configuring database: $DB"
+            psql -h localhost -U user_test -d $DB -c "
+            CREATE TABLE IF NOT EXISTS flight_static (
+                callsign VARCHAR(10) PRIMARY KEY,
+                airline_name VARCHAR(100),
+                origin_code VARCHAR(3),
+                destination_code VARCHAR(3),
+                commercial_flight BOOLEAN
+            );
 
-          CREATE TABLE IF NOT EXISTS live_data (
-              indice SERIAL,
-              request_id UUID NOT NULL,
-              callsign VARCHAR(10) NOT NULL,
-              icao24 VARCHAR(10) NOT NULL,
-              flight_date DATE NOT NULL,
-              departure_scheduled TIME NOT NULL,
-              longitude DOUBLE PRECISION,
-              latitude DOUBLE PRECISION,
-              baro_altitude DOUBLE PRECISION,
-              geo_altitude DOUBLE PRECISION, 
-              on_ground BOOLEAN,
-              velocity DOUBLE PRECISION,
-              vertical_rate DOUBLE PRECISION,
-              temperature DOUBLE PRECISION,
-              wind_speed DOUBLE PRECISION,
-              gust_speed DOUBLE PRECISION,
-              visibility DOUBLE PRECISION,
-              cloud_coverage DOUBLE PRECISION,
-              rain DOUBLE PRECISION,
-              global_condition VARCHAR(100),
-              unique_key TEXT NOT NULL,
-              CONSTRAINT pk_live_data PRIMARY KEY (request_id, unique_key),
-              CONSTRAINT fk_live_dynamic FOREIGN KEY(unique_key) 
-                  REFERENCES flight_dynamic(unique_key)
-          );
-          "
-          # 2. Injection des données réelles (seed_data.sql)
-          psql -h localhost -U user_test -d db_test -f api/tests/seed_data.sql
+            CREATE TABLE IF NOT EXISTS flight_dynamic (
+                callsign VARCHAR(10) NOT NULL,
+                icao24 VARCHAR(10) NOT NULL,
+                flight_date DATE NOT NULL,
+                departure_scheduled TIME NOT NULL,
+                departure_actual TIME,
+                arrival_scheduled TIME,
+                arrival_actual TIME,
+                status VARCHAR(15) NOT NULL,
+                last_update TIMESTAMPTZ DEFAULT NOW(),
+                unique_key TEXT NOT NULL,
+                CONSTRAINT pk_flight_dynamic_$DB PRIMARY KEY (unique_key)
+            );
+
+            CREATE TABLE IF NOT EXISTS live_data (
+                indice SERIAL,
+                request_id UUID NOT NULL,
+                callsign VARCHAR(10) NOT NULL,
+                icao24 VARCHAR(10) NOT NULL,
+                flight_date DATE NOT NULL,
+                departure_scheduled TIME NOT NULL,
+                longitude DOUBLE PRECISION,
+                latitude DOUBLE PRECISION,
+                baro_altitude DOUBLE PRECISION,
+                geo_altitude DOUBLE PRECISION, 
+                on_ground BOOLEAN,
+                velocity DOUBLE PRECISION,
+                vertical_rate DOUBLE PRECISION,
+                temperature DOUBLE PRECISION,
+                wind_speed DOUBLE PRECISION,
+                gust_speed DOUBLE PRECISION,
+                visibility DOUBLE PRECISION,
+                cloud_coverage DOUBLE PRECISION,
+                rain DOUBLE PRECISION,
+                global_condition VARCHAR(100),
+                unique_key TEXT NOT NULL,
+                CONSTRAINT pk_live_data_$DB PRIMARY KEY (request_id, unique_key),
+                CONSTRAINT fk_live_dynamic_$DB FOREIGN KEY(unique_key) 
+                    REFERENCES flight_dynamic(unique_key)
+            );
+            "
+            # Injection du seed dans la base courante
+            psql -h localhost -U user_test -d $DB -f api/tests/seed_data.sql
+          done
 
       - name: Run API Unit Tests
         env:
