@@ -7,7 +7,7 @@ on:
     branches: [ main, master, refactoring ]
 
 jobs:
-  # JOB 1 : Tests API (Python + Postgres)
+  # JOB 1 : Tests API (Python + Postgres avec données réelles)
   api:
     runs-on: ubuntu-latest
     services:
@@ -24,17 +24,56 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
     steps:
       - uses: actions/checkout@v3
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pytest httpx
           if [ -f api/requirements.txt ]; then pip install -r api/requirements.txt; fi
+
+      - name: Setup Test DB Tables & Data
+        env:
+          PGPASSWORD: password_test
+        run: |
+          # 1. Création de la structure cohérente avec le seed
+          psql -h localhost -U user_test -d db_test -c "
+          CREATE TABLE IF NOT EXISTS flight_static (
+              callsign VARCHAR(10) PRIMARY KEY, 
+              airline_name VARCHAR(100), 
+              origin_code VARCHAR(3), 
+              destination_code VARCHAR(3), 
+              commercial_flight BOOLEAN
+          );
+          CREATE TABLE IF NOT EXISTS flight_dynamic (
+              unique_key TEXT PRIMARY KEY,
+              callsign VARCHAR(10) NOT NULL, 
+              icao24 VARCHAR(10) NOT NULL, 
+              flight_date DATE,
+              departure_scheduled TIME,
+              status VARCHAR(15),
+              last_update TIMESTAMPTZ
+          );
+          CREATE TABLE IF NOT EXISTS live_data (
+              request_id UUID NOT NULL, 
+              callsign VARCHAR(10), 
+              icao24 VARCHAR(10), 
+              unique_key TEXT REFERENCES flight_dynamic(unique_key), 
+              longitude DOUBLE PRECISION, 
+              latitude DOUBLE PRECISION,
+              CONSTRAINT pk_live_data PRIMARY KEY (request_id, unique_key)
+          );
+          "
+          # 2. Injection des données réelles (seed_data.sql)
+          psql -h localhost -U user_test -d db_test -f api/tests/seed_data.sql
+
       - name: Run API Unit Tests
         env:
           POSTGRES_HOST: localhost
@@ -99,18 +138,15 @@ jobs:
       
       - name: Create external resources for CI
         run: |
-          # Création des volumes et du network marqués comme "external" dans ton compose
           docker network create airflow_network_terraform
           docker volume create postgres-db-volume-terraform
           docker volume create mlflow-artifacts-terraform
           docker volume create airflow-data-terraform
-          # Création d'un fichier variables.json fictif pour l'import Airflow
           mkdir -p airflow/config
           echo "{}" > airflow/config/variables.json
           
       - name: Validate Docker Compose Config
         env:
-          # Variables obligatoires pour éviter l'erreur "variable not set"
           AIRFLOW_JWT_SECRET: "ci_static_secret_32_characters_long"
           AIRFLOW_FERNET_KEY: "ci_static_fernet_key_validation="
           AIRFLOW_API_SECRET_KEY: "ci_static_api_secret_key_32_char"
