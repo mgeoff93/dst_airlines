@@ -72,3 +72,7 @@ resource "docker_volume" "mlflow_artifacts" {
 resource "docker_volume" "airflow_data" {
   name = "airflow-data-terraform"
 }
+
+resource "docker_volume" "grafana_data" {
+  name = "grafana-data-terraform"
+}
