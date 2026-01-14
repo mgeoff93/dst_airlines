@@ -17,7 +17,7 @@ logging.basicConfig(
 
 default_args = {
     "owner": "DST Airlines",
-    "start_date": datetime(2026, 1, 12),
+    "start_date": datetime(2026, 1, 13),
     "retries": 2,
     "retry_delay": timedelta(seconds = 30),
 }

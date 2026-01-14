@@ -3,7 +3,6 @@ from typing import Optional
 from api.core.database import db
 from api.services import flight_features
 import pandas as pd
-from api.metrics import DB_RECORDS_PROCESSED
 
 router = APIRouter(tags=["Live"])
 
@@ -41,7 +40,6 @@ def get_live_history_all(
 		params.append(limit)
 
 	live_rows = db.query(sql, tuple(params))
-	DB_RECORDS_PROCESSED.labels(table_name="live_data").inc(len(live_rows))
 	return {"count": len(live_rows), "data": live_rows}
 
 # --- Toutes les métadonnées (Current) ---

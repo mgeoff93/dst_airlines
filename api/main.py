@@ -16,5 +16,4 @@ app.include_router(merged.router)
 app.include_router(geography.router)
 app.include_router(predict.router)
 
-# 2. Instrumenter et Exposer
 Instrumentator().instrument(app).expose(app)

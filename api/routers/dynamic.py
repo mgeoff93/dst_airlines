@@ -4,7 +4,6 @@ from typing import Optional
 import pandas as pd
 from api.core.database import db
 from api.services import flight_features
-from api.metrics import DB_RECORDS_PROCESSED
 
 router = APIRouter(tags = ["Dynamic"])
 
@@ -27,7 +26,6 @@ def get_dynamic_flights(
 ):
 	datasets = get_datasets()
 	total_loaded = len(datasets["current"]) + len(datasets["done"])
-	DB_RECORDS_PROCESSED.labels(table_name = "flight_dynamic").inc(total_loaded)
 	
 	# 3. Sélection du dataset
 	if timeline == FlightStatus.live:

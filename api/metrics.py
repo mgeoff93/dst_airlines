@@ -1,28 +1,42 @@
 from prometheus_client import Counter, Histogram, Gauge
 
-# 1. Monitoring Ingestion : Pour suivre le remplissage des 35Go
-# On utilise des labels pour différencier les tables (static, dynamic, live)
-DB_RECORDS_PROCESSED = Counter(
-    'db_records_total', 
-    'Nombre de lignes traitees par l API', 
-    ['table_name']
+# --- POINT 4 : MÉTRIQUES APPLICATIVES ---
+
+# 1. Latence de prédiction (P95)
+# L'histogramme permet de calculer les percentiles dans Grafana
+PREDICTION_LATENCY = Histogram(
+	'api_prediction_duration_seconds',
+	'Temps de calcul de la prediction',
+	['model_alias'],
+	buckets=[0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0]
 )
 
-# 2. Performance de l'API : Temps de reponse des endpoints lourds (ex: merged)
-API_RESPONSE_TIME = Histogram(
-    'api_processing_seconds', 
-    'Temps de traitement interne des requetes',
-    buckets = [0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+# 2. Volume de requêtes par Alias (Champion vs Challenger)
+PREDICTION_COUNT = Counter(
+	'api_predictions_total',
+	'Nombre total de predictions effectuees',
+	['model_alias', 'model_version']
 )
 
-# 3. Santé de la connexion DB (0 ou 1)
-# Utile pour savoir instantanément si l'API a perdu le lien avec Postgres
-DATABASE_STATUS = Gauge('api_database_connected', 'Statut de la connexion a la base de données')
+# 3. Distribution des prédictions (Détection de dérive/Drift)
+# Permet de voir si le Challenger prédit des valeurs absurdes par rapport au Champion
+PREDICTION_OUTPUTS = Histogram(
+	'api_prediction_output_value',
+	'Distribution des retards predits (minutes)',
+	['model_alias'],
+	buckets=[-15.0, 0.0, 15.0, 30.0, 60.0, 120.0, 240.0]
+)
 
-# 4. Monitoring du cache (si tu utilises Redis ou un cache local)
-# Pour voir si tes requêtes tapent dans la DB ou dans le cache
-CACHE_HIT_RATE = Counter('api_cache_hits_total', 'Nombre de requêtes servies par le cache', ['cache_type'])
+# 4. Statut de chargement MLflow
+# Gauge : 1 = OK, 0 = Erreur
+MODEL_LOAD_STATUS = Gauge(
+	'api_model_load_status',
+	'Statut du chargement des modeles depuis MLflow',
+	['model_alias']
+)
 
-# 5. Taille des fichiers de logs ou fichiers temporaires
-# Très utile si Airflow génère beaucoup de logs sur ton volume Terraform
-DISK_CLEANUP_NEEDED = Gauge('api_temporary_files_count', 'Nombre de fichiers temporaires en attente')
+# 5. État de la base de données (Point 3 - Complément)
+DATABASE_STATUS = Gauge(
+	'api_database_connected',
+	'Statut de la connexion a la base Postgres (0 ou 1)'
+)

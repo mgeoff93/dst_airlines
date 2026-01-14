@@ -1,23 +1,21 @@
 import logging
+import time
 import requests
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import os
-
 import mlflow
-import mlflow.sklearn
-from mlflow.tracking import MlflowClient
+import sys
 
+from mlflow.tracking import MlflowClient
 from airflow.models import Variable
 from airflow.exceptions import AirflowSkipException
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, max_error
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
-# Correction : ordinal encoder gère mieux les catégories inconnues avec handle_unknown
 from sklearn.preprocessing import OrdinalEncoder
 from sklearn.impute import SimpleImputer
 
@@ -25,7 +23,7 @@ from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
 
 class MLClient:
 	def __init__(self):
-		# Configuration depuis Airflow Variables
+		# --- Configuration des Endpoints ---
 		self.api_url = Variable.get("AIRFLOW_API_URL")
 		self.mlflow_uri = Variable.get("MLFLOW_API_URL")
 		self.pushgateway_url = Variable.get("PUSHGATEWAY_URL")
@@ -34,25 +32,29 @@ class MLClient:
 		mlflow.set_tracking_uri(self.mlflow_uri)
 		mlflow.set_experiment(f"Experiment_{self.model_name}")
 
-		# --- Initialisation Prometheus ---
+		# --- Stratégie de Monitoring (Prometheus) ---
 		self.registry = CollectorRegistry()
-		self.metric_training_rows = Gauge('ml_training_rows_count', 'Lignes utilisées', registry=self.registry)
-		self.metric_r2_score = Gauge('ml_model_r2_score', 'Score R2', registry=self.registry)
-		self.metric_mae = Gauge('ml_model_mae', 'MAE', registry=self.registry)
+		self.metric_r2_score = Gauge('ml_model_r2_score', 'Score R2', ['status'], registry=self.registry)
+		self.metric_mae = Gauge('ml_model_mae', 'Mean Absolute Error', ['status'], registry=self.registry)
+		self.metric_inference_speed = Gauge('ml_model_inference_latency_ms', 'Vitesse inference', ['status'], registry=self.registry)
+		self.metric_training_rows = Gauge('ml_training_rows_count', 'Nombre de lignes utilisees', registry=self.registry)
 
 	def _push_metrics(self):
+		"""Envoi des métriques au Pushgateway."""
 		try:
 			push_to_gateway(self.pushgateway_url, job='airflow_ml_client', registry=self.registry)
 		except Exception as e:
 			logging.warning(f"Prometheus push failed: {e}")
 
 	def optimize_memory(self, df: pd.DataFrame) -> pd.DataFrame:
+		"""Réduit l'empreinte RAM des données."""
 		for col in df.columns:
 			if df[col].dtype == "float64": df[col] = df[col].astype("float32")
 			if df[col].dtype == "int64": df[col] = df[col].astype("int32")
 		return df
 
 	def data_preprocessing(self) -> str:
+		"""Pipeline d'extraction et nettoyage des données Airlines."""
 		try:
 			res_live = requests.get(f"{self.api_url}/live/history/all", timeout=30)
 			res_dynamic = requests.get(f"{self.api_url}/dynamic", params={"status": "history"}, timeout=30)
@@ -61,12 +63,12 @@ class MLClient:
 			data_dynamic = res_dynamic.json().get("data", [])
 
 			if not data_live or not data_dynamic:
-				raise AirflowSkipException("Données insuffisantes.")
+				raise AirflowSkipException("Données insuffisantes pour l'entraînement.")
 
 			df_live = pd.DataFrame(data_live)
 			df_dyn = pd.DataFrame(data_dynamic)
 
-			# Fusion stricte sur les cibles
+			# Fusion et nettoyage
 			df_merged = df_live.merge(df_dyn[["unique_key", "departure_difference", "arrival_difference"]], on="unique_key", how="left")
 			df_strict = df_merged.dropna(subset=["departure_difference", "arrival_difference"])
 
@@ -93,121 +95,113 @@ class MLClient:
 			raise
 
 	def train_and_log_model(self, file_path: str):
+		"""Entraînement, Audit Visuel et Gatekeeper de Promotion."""
 		data = pd.read_parquet(file_path)
 		TARGET = "arrival_difference"
-
 		X = data.drop(columns=[TARGET])
 		y = data[TARGET]
 
-		# --- Pipeline de transformation (Embarquée pour la prod) ---
-		categorical_cols = ["callsign", "icao24", "global_condition"]
-		numeric_cols = [c for c in X.columns if c not in categorical_cols]
-
-		numeric_transformer = Pipeline(steps=[
-			('imputer', SimpleImputer(strategy='constant', fill_value=0))
-		])
-
-		categorical_transformer = Pipeline(steps=[
-			('imputer', SimpleImputer(strategy='constant', fill_value='Unknown')),
-			('encoder', OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1))
-		])
-
-		preprocessor = ColumnTransformer(transformers=[
-			('num', numeric_transformer, numeric_cols),
-			('cat', categorical_transformer, categorical_cols)
-		])
-
 		X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+		
+		numeric_cols = ["longitude", "latitude", "geo_altitude", "velocity", "departure_difference"]
+		categorical_cols = ["callsign", "icao24", "global_condition"]
+		
+		preprocessor = ColumnTransformer([
+			('num', SimpleImputer(strategy='mean'), numeric_cols),
+			('cat', OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1), categorical_cols)
+		])
 
-		with mlflow.start_run(run_name="Champion-Challenger-Training"):
-			pipeline = Pipeline(steps=[
-				("preprocessor", preprocessor), 
-				("regressor", RandomForestRegressor(random_state=42, n_jobs=-1))
-			])            
-
-			param_grid = {
-				"regressor__n_estimators": [100],
-				"regressor__max_depth": [10, 15],
-			}
+		with mlflow.start_run(run_name="Champion_Challenger_Run"):
+			# Entraînement
+			pipeline = Pipeline([
+				("prep", preprocessor), 
+				("reg", RandomForestRegressor(n_estimators=100, max_depth=10, n_jobs=-1))
+			])
+			pipeline.fit(X_train, y_train)
 			
-			grid_search = GridSearchCV(pipeline, param_grid, cv=2, n_jobs=1, scoring="r2")
-			grid_search.fit(X_train, y_train)
-			best_model = grid_search.best_estimator_
-
-			# 1. Logging des paramètres et résumé
-			mlflow.log_params(grid_search.best_params_)
-			mlflow.log_dict(data.describe().to_dict(), "dataset_summary.json")
-
-			# 2. Métriques
-			y_pred = best_model.predict(X_test)
+			# --- 1. METRIQUES STATISTIQUES ---
+			y_pred = pipeline.predict(X_test)
 			metrics = {
+				"R2_Score": r2_score(y_test, y_pred),
 				"MAE": mean_absolute_error(y_test, y_pred),
 				"RMSE": np.sqrt(mean_squared_error(y_test, y_pred)),
-				"R2_Score": r2_score(y_test, y_pred),
 				"Max_Error": max_error(y_test, y_pred)
 			}
 			mlflow.log_metrics(metrics)
-			
-			# Prometheus
-			self.metric_r2_score.set(metrics["R2_Score"])
-			self.metric_mae.set(metrics["MAE"])
-			self._push_metrics()
 
-			# 3. Graphiques
-			# Feature Importance
+			# --- 2. AUDIT VISUEL (Artifacts) ---
 			try:
-				importances = best_model.named_steps['regressor'].feature_importances_
-				# On récupère les noms de colonnes après transformation
+				# Feature Importance
+				importances = pipeline.named_steps['reg'].feature_importances_
 				feat_names = numeric_cols + categorical_cols
 				indices = np.argsort(importances)
 				plt.figure(figsize=(10, 8))
-				plt.barh(range(len(indices)), importances[indices], align="center", color='skyblue')
+				plt.barh(range(len(indices)), importances[indices], align="center")
 				plt.yticks(range(len(indices)), [feat_names[i] for i in indices])
-				plt.title("Feature Importance")
+				plt.title("Audit : Importance des variables")
 				plt.savefig("feature_importance.png")
 				mlflow.log_artifact("feature_importance.png")
 				plt.close()
 
-				# Analyse des Résidus
+				# Analyse des résidus
 				plt.figure(figsize=(8, 6))
 				plt.scatter(y_pred, y_test - y_pred, alpha=0.3)
 				plt.axhline(y=0, color='r', linestyle='--')
-				plt.title("Analyse des Résidus")
-				plt.xlabel("Prédit")
-				plt.ylabel("Erreur (Réel - Prédit)")
+				plt.title("Audit : Analyse des résidus")
 				plt.savefig("residuals.png")
 				mlflow.log_artifact("residuals.png")
 				plt.close()
 			except Exception as e:
-				logging.warning(f"Erreur lors de la génération des graphiques : {e}")
+				logging.warning(f"Audit graphique échoué : {e}")
 
-			# 4. Sauvegarde et Enregistrement
-			mlflow.sklearn.log_model(
-				sk_model=best_model, 
-				artifact_path="model",
-				registered_model_name=self.model_name
-			)
+			# --- 3. MESURE OPERATIONNELLE (Latence) ---
+			start_inf = time.time()
+			_ = pipeline.predict(X_test.iloc[:100])
+			latence_ms = ((time.time() - start_inf) / 100) * 1000
+			mlflow.log_metric("inference_latency_ms", latence_ms)
 
-			# 5. Logique de Promotion (Champion vs Challenger)
+			# --- 4. LE GATEKEEPER (Logique de Promotion) ---
+			model_size_mb = sys.getsizeof(pipeline) / (1024**2)
+			top_3_features = [feat_names[i] for i in np.argsort(importances)[-3:]]
+			
 			client = MlflowClient()
-			new_r2 = metrics["R2_Score"]
 			try:
 				prod_ver = client.get_model_version_by_alias(self.model_name, "production")
 				prod_run = client.get_run(prod_ver.run_id)
-				prod_r2 = float(prod_run.data.metrics.get("R2_Score", -1))
+				champion_r2 = float(prod_run.data.metrics.get("R2_Score", -1))
+			except:
+				champion_r2 = -1
 
-				logging.info(f"Challenge: New R2 {new_r2:.4f} vs Prod R2 {prod_r2:.4f}")
+			checks = {
+				"stat": metrics["R2_Score"] > champion_r2,
+				"oper": latence_ms < 200,
+				"logic": "departure_difference" in top_3_features,
+				"tech": model_size_mb < 500
+			}
 
-				if new_r2 > prod_r2:
-					logging.info("--- NOUVEAU CHAMPION PROMOTE EN PRODUCTION ---")
-					latest_v = client.get_registered_model(self.model_name).latest_versions[0].version
-					client.set_registered_model_alias(self.model_name, "production", latest_v)
-				else:
-					logging.info("Le Challenger a échoué. La production reste inchangée.")
+			logging.info(f"Gatekeeper Checks: {checks}")
 
-			except Exception:
-				logging.info("Aucun champion en titre. Promotion automatique de la Version 1.")
+			# Décision finale
+			if all(checks.values()):
+				logging.info("PROMOTION VALIDEE")
+				mlflow.sklearn.log_model(pipeline, "model", registered_model_name=self.model_name)
 				latest_v = client.get_registered_model(self.model_name).latest_versions[0].version
 				client.set_registered_model_alias(self.model_name, "production", latest_v)
+				
+				# Update Prometheus (Le Challenger devient le Champion)
+				self.metric_r2_score.labels(status='production').set(metrics["R2_Score"])
+				self.metric_mae.labels(status='production').set(metrics["MAE"])
+				self.metric_inference_speed.labels(status='production').set(latence_ms)
+				# Reset Challenger
+				self.metric_r2_score.labels(status='challenger').set(0)
+			else:
+				logging.warning("PROMOTION REFUSEE")
+				# Update Prometheus (On affiche le Challenger à côté du Champion actuel)
+				self.metric_r2_score.labels(status='challenger').set(metrics["R2_Score"])
+				self.metric_mae.labels(status='challenger').set(metrics["MAE"])
+				self.metric_inference_speed.labels(status='challenger').set(latence_ms)
+				if champion_r2 != -1:
+					self.metric_r2_score.labels(status='production').set(champion_r2)
 
-			return {**metrics, "rows": int(len(data))}
+			self._push_metrics()
+			return {**metrics, "promoted": all(checks.values())}
