@@ -5,7 +5,7 @@ import pandas as pd
 from api.metrics import API_RESPONSE_TIME
 import time
 
-router = APIRouter(tags=["Merged metadatas"])
+router = APIRouter(tags=["Merged"])
 
 def get_datasets():
 	sql = "SELECT * FROM flight_dynamic ORDER BY last_update DESC"

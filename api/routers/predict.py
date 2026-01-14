@@ -8,7 +8,7 @@ import logging
 from api.routers.live import get_live_current_all
 from api.routers.dynamic import get_dynamic_flights, FlightStatus
 
-router = APIRouter(prefix="/prediction", tags=["ML Prediction"])
+router = APIRouter(prefix="/prediction", tags=["Prediction"])
 
 MODEL_URI = f"models:/{os.getenv('MODEL_NAME', 'ArrivalDelayModel')}@production"
 cached_model = None

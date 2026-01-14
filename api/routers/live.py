@@ -5,7 +5,7 @@ from api.services import flight_features
 import pandas as pd
 from api.metrics import DB_RECORDS_PROCESSED
 
-router = APIRouter(tags=["Live metadatas"])
+router = APIRouter(tags=["Live"])
 
 def get_current_subset():
 	sql = "SELECT * FROM flight_dynamic ORDER BY last_update DESC"

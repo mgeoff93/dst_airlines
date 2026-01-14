@@ -6,7 +6,7 @@ from api.core.database import db
 from api.services import flight_features
 from api.metrics import DB_RECORDS_PROCESSED
 
-router = APIRouter(tags = ["Dynamic metadatas"])
+router = APIRouter(tags = ["Dynamic"])
 
 # 1. Définition des choix (les valeurs doivent matcher tes conditions if/elif)
 class FlightStatus(str, Enum):

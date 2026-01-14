@@ -5,7 +5,7 @@ from api.services import flight_features
 import pandas as pd
 from api.metrics import DB_RECORDS_PROCESSED
 
-router = APIRouter(tags=["Static metadatas"])
+router = APIRouter(tags=["Static"])
 
 def get_current_subset():
 	sql = "SELECT * FROM flight_dynamic ORDER BY last_update DESC"
@@ -70,7 +70,4 @@ def get_static_flights(
 
 	DB_RECORDS_PROCESSED.labels(table_name = "flight_static").inc(len(rows))
 
-	return {
-		"count": len(rows),
-		"flights": rows
-	}
+	return {"count": len(rows), "flights": rows}
