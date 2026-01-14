@@ -56,4 +56,4 @@ def get_countries( # Correction du nom de la fonction
 		params["limit"] = limit
 
 	countries = pd.DataFrame(db.query(query_str, params))
-	return {"count": len(countries), "airports": countries.to_dict(orient = "records")}
+	return {"count": len(countries), "countries": countries.to_dict(orient = "records")}

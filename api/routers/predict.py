@@ -26,7 +26,7 @@ def get_model():
 			cached_model = mlflow.pyfunc.load_model(latest_uri)
 	return cached_model
 
-@router.post("/arrival_delay_prediction")
+@router.get("/arrival_delay")
 async def predict_all_delays():
 	model = get_model()
 	if not model:
