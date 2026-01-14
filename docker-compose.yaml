@@ -33,7 +33,7 @@ x-airflow-common:
     AIRFLOW__CORE__MIN_SERIALIZED_DAG_FETCH_INTERVAL: 10
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__CORE__TEST_CONNECTION: 'Enabled'
-    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-api-server:8080/execution/'
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${AIRFLOW_POSTGRES_DB}
     AIRFLOW__API__SECRET_KEY: ${AIRFLOW_API_SECRET_KEY}
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
@@ -65,6 +65,7 @@ x-airflow-common:
 services:
   postgres:
     image: postgres:13
+    container_name: postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -82,6 +83,7 @@ services:
 
   redis:
     image: redis:7.2-bookworm
+    container_name: redis
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -127,8 +129,9 @@ services:
           condition: service_healthy
     restart: always
 
-  airflow-apiserver:
+  airflow-api-server:
     <<: *airflow-common
+    container_name: api-server
     command: api-server
     ports:
       - "8080:8080"
@@ -140,6 +143,7 @@ services:
 
   airflow-scheduler:
     <<: *airflow-common
+    container_name: scheduler
     command: scheduler
     depends_on:
       <<: *airflow-common-depends-on
@@ -149,6 +153,7 @@ services:
 
   airflow-worker:
     <<: *airflow-common
+    container_name: worker
     command: celery worker
     environment:
       <<: *airflow-common-env
@@ -161,6 +166,7 @@ services:
 
   airflow-init:
     <<: *airflow-common
+    container_name: init
     entrypoint: /bin/bash
     command:
       - -c
@@ -225,6 +231,7 @@ services:
 
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter
+    container_name: postgres-exporter
     ports:
       - "9187:9187"
     environment:
@@ -286,6 +293,7 @@ services:
 
   init-permissions:
     image: alpine
+    container_name: init-permissions
     user: "0:0"
     volumes:
       - mlflow_artifacts:/mlflow/artifacts

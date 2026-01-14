@@ -4,7 +4,7 @@ SETLOCAL EnableDelayedExpansion
 :: --- Configuration ---
 SET OUTPUT_FILE=api\tests\seed_data.sql
 SET LIMIT=5
-SET CONTAINER_NAME=dst_airlines-postgres-1
+SET CONTAINER_NAME=postgres
 SET DB_USER=airflow
 SET DB_NAME=airlines
 
