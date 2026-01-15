@@ -1,5 +1,4 @@
 import logging
-import time
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -9,40 +8,14 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from airflow.models import Variable
 
-from prometheus_client import CollectorRegistry, Counter, Histogram, push_to_gateway
-
 class SeleniumClient:
 	def __init__(self):
 		# Récupération des variables Airflow
 		self.remote_url = Variable.get("SELENIUM_REMOTE_URL")
 		self.wait_time = int(Variable.get("SELENIUM_WAIT_TIME"))
 		self.pushgateway_url = Variable.get("PUSHGATEWAY_URL")
-		
-		# --- Initialisation Prometheus ---
-		self.registry = CollectorRegistry()
-		
-		# Métriques
-		self.metric_request_duration = Histogram(
-			'selenium_request_duration_seconds', 
-			'Temps de recherche d un élément CSS',
-			buckets=[0.5, 1.0, 2.0, 4.0, 10.0],
-			registry=self.registry
-		)
-		self.metric_request_total = Counter(
-			'selenium_requests_total', 
-			'Total des requêtes Selenium par statut',
-			['status'], # 'success' ou 'timeout'
-			registry=self.registry
-		)
 
 		self.driver = self._create_driver()
-
-	def _push_metrics(self):
-		"""Envoie les métriques au Pushgateway."""
-		try:
-			push_to_gateway(self.pushgateway_url, job='airflow_selenium', registry=self.registry)
-		except Exception as e:
-			logging.warning(f"Prometheus push failed for Selenium: {e}")
 
 	def _create_driver(self):
 		options = Options()
@@ -78,26 +51,15 @@ class SeleniumClient:
 		return driver
 
 	def request(self, selector, timeout=None):
-		start_time = time.time()
 		try:
 			element = WebDriverWait(self.driver, timeout or self.wait_time).until(
 				EC.presence_of_element_located((By.CSS_SELECTOR, selector))
 			)
-			
-			# Calcul de la durée et log succès
-			duration = time.time() - start_time
-			self.metric_request_duration.observe(duration)
-			self.metric_request_total.labels(status='success').inc()
-			
+
 			return element.text.strip().replace("\xa0", " ")
 		
 		except Exception:
-			# Log échec
-			self.metric_request_total.labels(status='timeout').inc()
 			return None
-		finally:
-			# On pousse les métriques après chaque requête pour un monitoring fin
-			self._push_metrics()
 
 	def close(self):
 		"""Libère les ressources immédiatement."""
@@ -105,7 +67,5 @@ class SeleniumClient:
 			if self.driver:
 				self.driver.quit()
 				logging.info("Selenium driver closed and resources freed")
-				# On s'assure que les dernières métriques sont envoyées avant de fermer
-				self._push_metrics()
 		except Exception as e:
 			logging.debug(f"Error during driver quit: {e}")

@@ -7,7 +7,7 @@ import logging
 import time
 
 # Import des métriques définies dans ton plan
-from api.metrics import PREDICTION_LATENCY, PREDICTION_COUNT, PREDICTION_OUTPUTS, MODEL_LOAD_STATUS
+from api.metrics import PREDICTION_COUNT, PREDICTION_OUTPUTS, MODEL_LOAD_STATUS
 
 from api.routers.live import get_live_current_all
 from api.routers.dynamic import get_dynamic_flights, FlightStatus
@@ -24,8 +24,8 @@ current_model_version = "unknown"
 
 def get_model():
 	global cached_model, last_update_ts, current_model_version
-	now = time.time()
 
+	now = time.time()
 	if cached_model is None or (now - last_update_ts) > CACHE_TTL:
 		try:
 			mlflow.set_tracking_uri(os.getenv("MLFLOW_API_URL"))
@@ -84,14 +84,9 @@ async def predict_all_delays():
 		features = ["callsign", "icao24", "longitude", "latitude", "geo_altitude", "velocity", "global_condition", "departure_difference"]
 		X = df.reindex(columns=features).fillna(0)
 
-		# 4. Prédiction avec Monitoring (Piliers B et C du plan)
-		start_time = time.time()
-		
 		preds = model.predict(X)
 		
 		# Enregistrement des métriques Prometheus
-		duration = time.time() - start_time
-		PREDICTION_LATENCY.labels(model_alias="production").observe(duration)
 		PREDICTION_COUNT.labels(model_alias="production", model_version=current_model_version).inc()
 		for p in preds:
 			PREDICTION_OUTPUTS.labels(model_alias="production").observe(p)

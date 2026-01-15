@@ -13,6 +13,9 @@ volumes:
   airflow_data:
     external: true
     name: airflow-data-terraform
+  grafana_data:
+    external: true
+    name: grafana-data-terraform
 
 x-airflow-common:
   &airflow-common
@@ -285,6 +288,13 @@ services:
     container_name: grafana
     ports:
       - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
     networks:
       - airflow_network
     depends_on:

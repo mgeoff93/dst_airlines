@@ -5,8 +5,6 @@ from typing import List, Dict, Optional
 from airflow.models import Variable
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
-from prometheus_client import CollectorRegistry, Counter, push_to_gateway
-
 class PostgresClient:
 	def __init__(self):
 		conn_id = Variable.get("CONNECTION_ID")
@@ -14,30 +12,6 @@ class PostgresClient:
 		self.conn = self.hook.get_conn()
 		self.cur = self.conn.cursor()
 		self.pushgateway_url = Variable.get("PUSHGATEWAY_URL")
-
-		# --- Initialisation Prometheus ---
-		self.registry = CollectorRegistry()
-		
-		# Métriques de performance DB
-		self.metric_db_operations = Counter(
-			'postgres_operations_total', 
-			'Nombre d opérations DB par table et type',
-			['table', 'operation', 'status'], # ex: table='live_data', op='insert', status='success'
-			registry=self.registry
-		)
-		# Métrique métier : Nettoyage automatique
-		self.metric_auto_closures = Counter(
-			'postgres_flights_auto_closed_total', 
-			'Nombre de vols clôturés automatiquement par timeout',
-			registry=self.registry
-		)
-
-	def _push_metrics(self):
-		"""Envoie les métriques au Pushgateway."""
-		try:
-			push_to_gateway(self.pushgateway_url, job='airflow_postgres', registry=self.registry)
-		except Exception as e:
-			logging.warning(f"Prometheus push failed for Postgres: {e}")
 
 	def get_static_flight(self, callsign: str) -> Optional[Dict]:
 		"""Récupère les infos statiques pour le triage."""
@@ -101,11 +75,6 @@ class PostgresClient:
 				self.hook.run(update_sql, parameters=(dynamic["unique_key"],))
 				dynamic["status"] = "arrived"
 				
-				# Update métrique auto-clôture
-				self.metric_auto_closures.inc()
-				self._push_metrics()
-				logging.info(f"Auto-closing flight {callsign} (Timeout)")
-				
 		return dynamic
 
 	def insert_flight_static(self, rows: List[Dict]):
@@ -122,12 +91,9 @@ class PostgresClient:
 			try:
 				self.cur.execute(query, row)
 				self.conn.commit()
-				self.metric_db_operations.labels(table='flight_static', operation='upsert', status='success').inc()
 			except Exception as e:
 				self.conn.rollback()
-				self.metric_db_operations.labels(table='flight_static', operation='upsert', status='error').inc()
 				logging.error(f"Static insert failed for {row.get('callsign')}: {e}")
-		self._push_metrics()
 
 	def insert_flight_dynamic(self, rows: List[Dict]):
 		if not rows: return
@@ -148,12 +114,9 @@ class PostgresClient:
 			try:
 				self.cur.execute(query, row)
 				self.conn.commit()
-				self.metric_db_operations.labels(table='flight_dynamic', operation='upsert', status='success').inc()
 			except Exception as e:
 				self.conn.rollback()
-				self.metric_db_operations.labels(table='flight_dynamic', operation='upsert', status='error').inc()
 				logging.error(f"Dynamic upsert failed for {row.get('unique_key')}: {e}")
-		self._push_metrics()
 
 	def insert_live_data(self, rows: List[Dict]):
 		if not rows: return
@@ -173,16 +136,12 @@ class PostgresClient:
 			try:
 				self.cur.execute(query, row)
 				self.conn.commit()
-				self.metric_db_operations.labels(table='live_data', operation='insert', status='success').inc()
 			except Exception as e:
 				self.conn.rollback()
-				self.metric_db_operations.labels(table='live_data', operation='insert', status='error').inc()
 				logging.error(f"Live insert failed for {row.get('callsign')}: {e}")
-		self._push_metrics()
 
 	def close(self):
 		try:
-			self._push_metrics()
 			self.cur.close()
 			self.conn.close()
 		except: 

@@ -4,7 +4,7 @@ import time
 
 from airflow.models import Variable
 
-from prometheus_client import CollectorRegistry, Gauge, Counter, push_to_gateway
+from prometheus_client import CollectorRegistry, Counter, Gauge, push_to_gateway
 
 class OpenskyClient:
 	def __init__(self):
@@ -18,22 +18,17 @@ class OpenskyClient:
 
 		# --- Initialisation Prometheus ---
 		self.registry = CollectorRegistry()
-		
-		# Métriques
-		self.metric_flights_retrieved = Gauge(
-			'opensky_flights_retrieved', 
-			'Nombre de vols récupérés (brut)', 
-			registry=self.registry
-		)
+
+		# Métriques critiques uniquement
 		self.metric_api_errors = Counter(
-			'opensky_api_errors_total', 
-			'Total des erreurs API OpenSky', 
-			['status_code'], 
+			'opensky_api_errors_total',
+			'Total des erreurs API OpenSky',
+			['status_code'],
 			registry=self.registry
 		)
 		self.metric_quota_exceeded = Gauge(
-			'opensky_quota_status', 
-			'1 si quota dépassé, 0 sinon', 
+			'opensky_quota_status',
+			'1 si quota dépassé, 0 sinon',
 			registry=self.registry
 		)
 
@@ -71,7 +66,7 @@ class OpenskyClient:
 	def get_rawdata(self, max_retries=5, backoff_factor=2):
 		attempt = 0
 		self.metric_quota_exceeded.set(0) # Reset status
-		
+
 		while attempt < max_retries:
 			try:
 				response = requests.get(self.api_url, headers = self.headers, timeout=15)
@@ -89,7 +84,7 @@ class OpenskyClient:
 					logging.warning("Token invalid, refreshing")
 					self.metric_api_errors.labels(status_code='401').inc()
 					self._refresh_token()
-					continue 
+					continue
 
 				# Cas 3 : Erreurs serveur (500, 502, 503, 504)
 				if response.status_code in [500, 502, 503, 504]:
@@ -106,17 +101,11 @@ class OpenskyClient:
 				# Vérification de sécurité sur le contenu
 				if not data or 'states' not in data:
 					logging.warning("OpenSky returned successful response but no states found")
-					self.metric_flights_retrieved.set(0)
-					self._push_metrics()
 					return {"states": []}
 
 				flights_count = len(data.get('states', []))
 				logging.info(f"Retrieved {flights_count} flights")
-				
-				# Update & Push metrics
-				self.metric_flights_retrieved.set(flights_count)
-				self._push_metrics()
-				
+
 				return data
 
 			except requests.RequestException as e:

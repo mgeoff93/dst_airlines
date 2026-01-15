@@ -1,0 +1,95 @@
+{
+  "title": "Flight Monitoring - Host PC",
+  "uid": "flight_delay_final",
+  "schemaVersion": 38,
+  "refresh": "10s",
+  "panels": [
+    {
+      "title": "Statut Instantané",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        { "expr": "100 - (avg(irate(node_cpu_seconds_total{mode='idle'}[1m])) * 100)", "legendFormat": "CPU" },
+        { "expr": "100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))", "legendFormat": "RAM" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0, "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 75 },
+              { "color": "red", "value": 90 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Charge CPU Cumulée (Stacking)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (cpu) (irate(node_cpu_seconds_total{mode!='idle'}[2m])) * 100",
+          "legendFormat": "Cœur {{cpu}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 600,
+          "custom": {
+            "stacking": { "mode": "normal" },
+            "fillOpacity": 40,
+            "lineInterpolation": "smooth"
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["last", "max"] }
+      }
+    },
+    {
+      "title": "Stabilité Mémoire (Usage Réel)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        { "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes", "legendFormat": "Usage" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "max": 8589934592,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 6979321856 },
+              { "color": "red", "value": 7730941132 }
+            ]
+          },
+          "custom": { "gradientMode": "area", "fillOpacity": 45 }
+        }
+      }
+    },
+    {
+      "title": "Pression Système (Load 1m)",
+      "type": "state-timeline",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        { "expr": "node_load1", "legendFormat": "Load Average" }
+      ],
+      "options": { "mergeValues": true, "showValue": "always" }
+    }
+  ],
+  "timezone": "browser"
+}
