@@ -148,5 +148,5 @@ variable "AIRFLOW_UID" {
 # --- Monitoring ---
 variable "PUSHGATEWAY_URL" {
   type    = string
-  default = "pushgateway:9091"
+  default = "http://pushgateway:9091"
 }
