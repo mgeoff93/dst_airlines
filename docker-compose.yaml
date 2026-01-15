@@ -327,3 +327,13 @@ services:
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
     networks:
       - airflow_network
+      
+  statsd-exporter:
+    image: prom/statsd-exporter:latest
+    container_name: statsd-exporter
+    ports:
+      - "9102:9102"
+      - "9125:9125/udp"
+    networks:
+      - airflow_network
+    restart: always
