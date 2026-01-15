@@ -11,140 +11,90 @@
       "id": 1,
       "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
       "type": "row",
-      "title": "Extraction"
+      "title": "Pipeline flow"
     },
     {
       "id": 2,
-      "gridPos": {"h": 6, "w": 8, "x": 0, "y": 1},
-      "type": "stat",
-      "title": "Flights extracted (total)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 1},
+      "type": "timeseries",
+      "title": "Extraction",
       "datasource": {"type": "prometheus", "uid": "Prometheus"},
-      "targets": [{"expr": "etl_extracted_flights_total or vector(0)", "refId": "A"}],
+      "targets": [
+        {"expr": "rate(etl_extracted_flights_total[5m]) * 60 or vector(0)", "refId": "A", "legendFormat": "Flights/min"},
+        {"expr": "rate(etl_api_errors_total[5m]) * 60 or vector(0)", "refId": "B", "legendFormat": "Errors/min"}
+      ],
       "options": {
-        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
-        "textMode": "value",
-        "colorMode": "value",
-        "graphMode": "area"
-      },
-      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}}
-    },
-    {
-      "id": 3,
-      "gridPos": {"h": 6, "w": 8, "x": 8, "y": 1},
-      "type": "stat",
-      "title": "API errors",
-      "datasource": {"type": "prometheus", "uid": "Prometheus"},
-      "targets": [{"expr": "etl_api_errors_total or vector(0)", "refId": "A"}],
-      "options": {
-        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
-        "textMode": "value",
-        "colorMode": "background",
-        "graphMode": "area"
+        "legend": {"displayMode": "list", "placement": "bottom"}
       },
       "fieldConfig": {
         "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [{"value": null, "color": "green"}, {"value": 1, "color": "red"}]
-          }
-        }
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 20,
+            "lineWidth": 2
+          },
+          "min": 0
+        },
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "Flights/min"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]},
+          {"matcher": {"id": "byName", "options": "Errors/min"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]}
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 1},
+      "type": "piechart",
+      "title": "Triage",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [
+        {"expr": "etl_triage_total{type=\"scrape\"}", "refId": "A", "legendFormat": "Scrape"},
+        {"expr": "etl_triage_total{type=\"direct\"}", "refId": "B", "legendFormat": "Direct"}
+      ],
+      "options": {
+        "legend": {"displayMode": "list", "placement": "right", "values": ["percent"]},
+        "pieType": "donut",
+        "displayLabels": ["percent"]
+      },
+      "fieldConfig": {
+        "defaults": {}
       }
     },
     {
       "id": 4,
-      "gridPos": {"h": 6, "w": 8, "x": 16, "y": 1},
-      "type": "gauge",
-      "title": "Success rate",
-      "datasource": {"type": "prometheus", "uid": "Prometheus"},
-      "targets": [{"expr": "100 * ((etl_extracted_flights_total or vector(0)) / ((etl_extracted_flights_total or vector(0)) + (etl_api_errors_total or vector(1))))", "refId": "A"}],
-      "options": {"showThresholdLabels": false, "showThresholdMarkers": true},
-      "fieldConfig": {
-        "defaults": {
-          "min": 0, "max": 100,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [{"value": null, "color": "red"}, {"value": 80, "color": "yellow"}, {"value": 95, "color": "green"}]
-          },
-          "unit": "percent"
-        }
-      }
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 9},
+      "type": "row",
+      "title": "Loading"
     },
     {
       "id": 5,
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 7},
-      "type": "row",
-      "title": "Triage"
-    },
-    {
-      "id": 6,
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
-      "type": "piechart",
-      "title": "Triage distribution",
+      "gridPos": {"h": 6, "w": 16, "x": 0, "y": 10},
+      "type": "timeseries",
+      "title": "Rows inserted",
       "datasource": {"type": "prometheus", "uid": "Prometheus"},
       "targets": [
-        {"expr": "etl_triage_total{type=\"scrape\"}", "refId": "A", "legendFormat": "Needs scraping"},
-        {"expr": "etl_triage_total{type=\"direct\"}", "refId": "B", "legendFormat": "Direct (cached)"}
+        {"expr": "rate(etl_loaded_rows_total{table=\"static\"}[5m]) * 60 or vector(0)", "refId": "A", "legendFormat": "Static/min"},
+        {"expr": "rate(etl_loaded_rows_total{table=\"dynamic\"}[5m]) * 60 or vector(0)", "refId": "B", "legendFormat": "Dynamic/min"},
+        {"expr": "rate(etl_loaded_rows_total{table=\"live\"}[5m]) * 60 or vector(0)", "refId": "C", "legendFormat": "Live/min"}
       ],
       "options": {
-        "legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull"]},
-        "pieType": "pie",
-        "tooltip": {"mode": "single"}
+        "legend": {"displayMode": "list", "placement": "bottom"}
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {"hideFrom": {"tooltip": false, "viz": false, "legend": false}}
-        }
-      }
-    },
-    {
-      "id": 7,
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
-      "type": "timeseries",
-      "title": "Triage evolution",
-      "datasource": {"type": "prometheus", "uid": "Prometheus"},
-      "targets": [
-        {"expr": "etl_triage_total{type=\"scrape\"}", "refId": "A", "legendFormat": "Needs scraping"},
-        {"expr": "etl_triage_total{type=\"direct\"}", "refId": "B", "legendFormat": "Direct (cached)"}
-      ],
-      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"]}},
-      "fieldConfig": {
-        "defaults": {
-          "custom": {"drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 30, "stacking": {"mode": "normal"}},
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "stacking": {"mode": "normal"}
+          },
           "min": 0
         }
       }
     },
     {
-      "id": 8,
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 16},
-      "type": "row",
-      "title": "Loading"
-    },
-    {
-      "id": 9,
-      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 17},
-      "type": "bargauge",
-      "title": "Rows loaded by table",
-      "datasource": {"type": "prometheus", "uid": "Prometheus"},
-      "targets": [
-        {"expr": "etl_loaded_rows_total{table=\"static\"} or vector(0)", "refId": "A", "legendFormat": "Static"},
-        {"expr": "etl_loaded_rows_total{table=\"dynamic\"} or vector(0)", "refId": "B", "legendFormat": "Dynamic"},
-        {"expr": "etl_loaded_rows_total{table=\"live\"} or vector(0)", "refId": "C", "legendFormat": "Live"}
-      ],
-      "options": {
-        "orientation": "horizontal",
-        "displayMode": "gradient",
-        "showUnfilled": true
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {"mode": "palette-classic"}
-        }
-      }
-    },
-    {
-      "id": 10,
-      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 17},
+      "id": 6,
+      "gridPos": {"h": 6, "w": 8, "x": 16, "y": 10},
       "type": "stat",
       "title": "Selenium timeouts",
       "datasource": {"type": "prometheus", "uid": "Prometheus"},
@@ -159,25 +109,14 @@
         "defaults": {
           "thresholds": {
             "mode": "absolute",
-            "steps": [{"value": null, "color": "green"}, {"value": 1, "color": "yellow"}, {"value": 10, "color": "red"}]
+            "steps": [
+              {"value": null, "color": "green"},
+              {"value": 1, "color": "yellow"},
+              {"value": 10, "color": "red"}
+            ]
           }
         }
       }
-    },
-    {
-      "id": 11,
-      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 17},
-      "type": "stat",
-      "title": "Flights parsed",
-      "datasource": {"type": "prometheus", "uid": "Prometheus"},
-      "targets": [{"expr": "flightaware_flights_parsed_total or vector(0)", "refId": "A"}],
-      "options": {
-        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
-        "textMode": "value",
-        "colorMode": "value",
-        "graphMode": "area"
-      },
-      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}}
     }
   ],
   "templating": {"list": []},
