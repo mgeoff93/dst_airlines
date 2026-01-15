@@ -43,10 +43,14 @@ def flight_data_pipeline():
 	def requesting(airline_filter: str = "AFR") -> List[Dict]:
 		from opensky_client import OpenskyClient
 		from prometheus_client import CollectorRegistry, Counter
-		
+	
 		registry = CollectorRegistry()
 		metric_extracted = Counter('etl_extracted_flights_total', 'Vols extraits', registry=registry)
 		metric_errors = Counter('etl_api_errors_total', 'Erreurs API', ['api_name'], registry=registry)
+
+		# AJOUT : Initialiser les compteurs à 0 pour garantir leur existence
+		metric_extracted.inc(0)
+		metric_errors.labels(api_name='opensky').inc(0)
 
 		openskycli = OpenskyClient()
 		raw = openskycli.get_rawdata()
@@ -110,22 +114,103 @@ def flight_data_pipeline():
 		from selenium_client import SeleniumClient
 		from postgres_client import PostgresClient
 		from flightaware_client import FlightAwareClient
-		
-		# Logique de scraping habituelle...
-		# (abrégée ici pour la lisibilité, gardez votre code interne)
-		return {"static_rows": [], "dynamic_rows": [], "live_rows": []}
+		from weather_client import WeatherClient
+	
+		seleniumcli = SeleniumClient()
+		postgrescli = PostgresClient()
+		weathercli = WeatherClient()
+		flightawarecli = FlightAwareClient(seleniumcli, postgrescli)
+	
+		def time_to_str(t): return t.strftime("%H:%M:%S") if t else None
+	
+		try:
+			callsign = flight.get("callsign")
+			icao24 = flight.get("icao24")
+			lat, lon = flight.get("latitude"), flight.get("longitude")
+			flight.update(weathercli.get_weather(lat, lon))
+	
+			static_row = flightawarecli.parse_static_flight(callsign)
+			if not static_row: 
+				return None
+	
+			dynamic_row = flightawarecli.parse_dynamic_flight(callsign, icao24)
+			if dynamic_row:
+				dynamic_row.update({
+					"departure_scheduled": time_to_str(dynamic_row.get("departure_scheduled")),
+					"departure_actual": time_to_str(dynamic_row.get("departure_actual")),
+					"arrival_scheduled": time_to_str(dynamic_row.get("arrival_scheduled")),
+					"arrival_actual": time_to_str(dynamic_row.get("arrival_actual"))
+				})
+	
+			live_row = {
+				**flight,
+				"flight_date": dynamic_row["flight_date"] if dynamic_row else None,
+				"unique_key": dynamic_row["unique_key"] if dynamic_row else None
+			}
+	
+			return {
+				"static_rows": [static_row] if static_row.get("commercial_flight") else [],
+				"dynamic_rows": [dynamic_row] if dynamic_row else [],
+				"live_rows": [live_row]
+			}
+		finally:
+			seleniumcli.close()
+			postgrescli.close()
 
 	@task
 	def loading(scrape_results: List[Optional[Dict]], direct_rows: List[Dict]):
 		from postgres_client import PostgresClient
 		from prometheus_client import CollectorRegistry, Counter
-		
+	
 		registry = CollectorRegistry()
 		metric_loaded = Counter('etl_loaded_rows_total', 'Lignes DB', ['table'], registry=registry)
+	
+		# AJOUT : Initialiser les compteurs à 0
+		metric_loaded.labels(table='static').inc(0)
+		metric_loaded.labels(table='dynamic').inc(0)
+		metric_loaded.labels(table='live').inc(0)
+	
 		postgrescli = PostgresClient()
 		try:
-			# Insertion en base...
+			# Initialiser les compteurs
+			count_static = 0
+			count_dynamic = 0
+			count_live = 0
+	
+			# Traiter les résultats du scraping
+			for res in scrape_results:
+				if res:
+					static_rows = res.get("static_rows", [])
+					dynamic_rows = res.get("dynamic_rows", [])
+					live_rows = res.get("live_rows", [])
+	
+					if static_rows:
+						postgrescli.insert_flight_static(static_rows)
+						count_static += len(static_rows)
+	
+					if dynamic_rows:
+						postgrescli.insert_flight_dynamic(dynamic_rows)
+						count_dynamic += len(dynamic_rows)
+	
+					if live_rows:
+						postgrescli.insert_live_data(live_rows)
+						count_live += len(live_rows)
+	
+			# Traiter les vols directs
+			if direct_rows:
+				postgrescli.insert_live_data(direct_rows)
+				count_live += len(direct_rows)
+	
+			# Mettre à jour les métriques Prometheus
+			metric_loaded.labels(table='static').inc(count_static)
+			metric_loaded.labels(table='dynamic').inc(count_dynamic)
+			metric_loaded.labels(table='live').inc(count_live)
+	
+			# Pousser les métriques
 			push_dag_metrics(registry)
+	
+			logging.info(f"Loaded: {count_static} static, {count_dynamic} dynamic, {count_live} live")
+	
 		finally:
 			postgrescli.close()
 
