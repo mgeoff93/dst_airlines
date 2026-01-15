@@ -13,7 +13,6 @@ class SeleniumClient:
 		# Récupération des variables Airflow
 		self.remote_url = Variable.get("SELENIUM_REMOTE_URL")
 		self.wait_time = int(Variable.get("SELENIUM_WAIT_TIME"))
-		self.pushgateway_url = Variable.get("PUSHGATEWAY_URL")
 
 		self.driver = self._create_driver()
 

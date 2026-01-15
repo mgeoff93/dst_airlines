@@ -1,9 +1,7 @@
 import logging
 import requests
 import time
-
 from airflow.models import Variable
-
 from prometheus_client import CollectorRegistry, Counter, Gauge, push_to_gateway
 
 class OpenskyClient:
@@ -13,31 +11,40 @@ class OpenskyClient:
 		self.username = Variable.get("OPENSKY_USERNAME")
 		self.password = Variable.get("OPENSKY_PASSWORD")
 		self.pushgateway_url = Variable.get("PUSHGATEWAY_URL")
-		self.token = self._get_token()
-		self.headers = {"Authorization": f"Bearer {self.token}"}
-
-		# --- Initialisation Prometheus ---
+		
+		# Initialisation Prometheus
 		self.registry = CollectorRegistry()
-
-		# Métriques critiques uniquement
 		self.metric_api_errors = Counter(
 			'opensky_api_errors_total',
 			'Total des erreurs API OpenSky',
 			['status_code'],
 			registry=self.registry
 		)
-		self.metric_quota_exceeded = Gauge(
+		self.metric_quota_status = Gauge(
 			'opensky_quota_status',
-			'1 si quota dépassé, 0 sinon',
+			'1 si quota depasse, 0 sinon',
 			registry=self.registry
 		)
 
+		# Pre-initialisation des labels pour eviter les "NaN" dans Grafana
+		for code in ['401', '429', '500', 'network_error', 'auth_error']:
+			self.metric_api_errors.labels(status_code=code).inc(0)
+
+		# Authentification
+		try:
+			self.token = self._get_token()
+			self.headers = {"Authorization": f"Bearer {self.token}"}
+		except Exception as e:
+			self.metric_api_errors.labels(status_code='auth_error').inc()
+			self._push_metrics()
+			raise e
+
 	def _push_metrics(self):
-		"""Envoie les métriques au Pushgateway."""
+		"""Envoi systematique pour garantir la visibilite dans le Pushgateway."""
 		try:
 			push_to_gateway(self.pushgateway_url, job='airflow_opensky', registry=self.registry)
 		except Exception as e:
-			logging.warning(f"Metrics push failed: {e}")
+			logging.warning(f"Prometheus push failed: {e}")
 
 	def _generate_token(self):
 		data = {
@@ -53,7 +60,7 @@ class OpenskyClient:
 		return token
 
 	def _get_token(self):
-		token = Variable.get("OPENSKY_TOKEN")
+		token = Variable.get("OPENSKY_TOKEN", default_var=None)
 		if not token:
 			return self._generate_token()
 		return token
@@ -65,85 +72,67 @@ class OpenskyClient:
 
 	def get_rawdata(self, max_retries=5, backoff_factor=2):
 		attempt = 0
-		self.metric_quota_exceeded.set(0) # Reset status
+		self.metric_quota_status.set(0)
 
 		while attempt < max_retries:
 			try:
-				response = requests.get(self.api_url, headers = self.headers, timeout=15)
+				response = requests.get(self.api_url, headers=self.headers, timeout=15)
 
-				# Cas 1 : Quota dépassé
 				if response.status_code == 429:
-					logging.error("CRITICAL: OpenSky quota exceeded.")
 					self.metric_api_errors.labels(status_code='429').inc()
-					self.metric_quota_exceeded.set(1)
+					self.metric_quota_status.set(1)
 					self._push_metrics()
 					raise RuntimeError("OpenSky Quota Exceeded")
 
-				# Cas 2 : Token expiré
 				if response.status_code == 401:
-					logging.warning("Token invalid, refreshing")
 					self.metric_api_errors.labels(status_code='401').inc()
 					self._refresh_token()
 					continue
 
-				# Cas 3 : Erreurs serveur (500, 502, 503, 504)
-				if response.status_code in [500, 502, 503, 504]:
+				if response.status_code >= 500:
 					self.metric_api_errors.labels(status_code=str(response.status_code)).inc()
 					attempt += 1
-					wait_time = backoff_factor ** attempt
-					logging.warning(f"Server error {response.status_code} - retry {attempt}/{max_retries}")
-					time.sleep(wait_time)
+					time.sleep(backoff_factor ** attempt)
 					continue
 
 				response.raise_for_status()
 				data = response.json()
-
-				# Vérification de sécurité sur le contenu
-				if not data or 'states' not in data:
-					logging.warning("OpenSky returned successful response but no states found")
-					return {"states": []}
-
-				flights_count = len(data.get('states', []))
-				logging.info(f"Retrieved {flights_count} flights")
-
-				return data
+				
+				# Succes : on pousse les metriques a 0 erreur
+				self._push_metrics()
+				return data if 'states' in data else {"states": []}
 
 			except requests.RequestException as e:
 				self.metric_api_errors.labels(status_code='network_error').inc()
 				attempt += 1
-				wait_time = backoff_factor ** attempt
-				logging.error(f"Network error {attempt}/{max_retries}: {e}")
-				time.sleep(wait_time)
+				time.sleep(backoff_factor ** attempt)
 
 		self._push_metrics()
 		raise RuntimeError(f"Failed to get OpenSky data after {max_retries} attempts")
 
-	def normalize_rawdata(self, raw_data, filter = None):
-		states = raw_data.get("states", [])
+	def normalize_rawdata(self, raw_data, filter=None):
+		states = raw_data.get("states", []) or []
 		normalized = []
+		filters = []
+		if filter:
+			filters = [filter.upper()] if isinstance(filter, str) else [f.upper() for f in filter]
 
 		for s in states:
-			callsign = s[1]
-			if filter:
-				filters = [filter.upper()] if isinstance(filter, str) else [f.upper() for f in filter]
-				if not callsign or not any(callsign.upper().strip().startswith(p) for p in filters):
-					continue
-
-			longitude, latitude = s[5], s[6]
-			if longitude is None or latitude is None:
+			callsign = (s[1] or "").strip().upper()
+			if filters and not any(callsign.startswith(p) for p in filters):
 				continue
+			
+			if s[5] is None or s[6] is None: continue
 
 			normalized.append({
 				"icao24": s[0],
-				"callsign": (callsign or "").strip(),
-				"longitude": longitude,
-				"latitude": latitude,
+				"callsign": callsign,
+				"longitude": s[5],
+				"latitude": s[6],
 				"baro_altitude": s[7],
 				"geo_altitude": s[13],
 				"on_ground": s[8],
 				"velocity": s[9],
 				"vertical_rate": s[11],
 			})
-
-		logging.info(f"Normalized {len(normalized)} flights after filter")
 		return normalized

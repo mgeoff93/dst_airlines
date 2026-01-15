@@ -9,7 +9,6 @@ class WeatherClient:
 		self.api_key = Variable.get("WEATHER_API_KEY")
 		self.fields = Variable.get("WEATHER_FIELDS", deserialize_json = True)
 		self.timeout = int(Variable.get("WEATHER_TIMEOUT"))
-		self.pushgateway_url = Variable.get("PUSHGATEWAY_URL")
 
 	def get_weather(self, lat, lon):
 		try:

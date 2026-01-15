@@ -11,7 +11,6 @@ class PostgresClient:
 		self.hook = PostgresHook(postgres_conn_id = conn_id)
 		self.conn = self.hook.get_conn()
 		self.cur = self.conn.cursor()
-		self.pushgateway_url = Variable.get("PUSHGATEWAY_URL")
 
 	def get_static_flight(self, callsign: str) -> Optional[Dict]:
 		"""Récupère les infos statiques pour le triage."""
