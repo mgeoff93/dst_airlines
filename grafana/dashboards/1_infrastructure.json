@@ -1,0 +1,256 @@
+{
+  "title": "1 - Infrastructure and System",
+  "uid": "infrastructure_and_system",
+  "tags": ["docker", "host", "airlines"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+      "type": "row",
+      "title": "Critical warnings"
+    },
+    {
+      "id": 2,
+      "gridPos": {"h": 4, "w": 24, "x": 0, "y": 1},
+      "type": "stat",
+      "title": "OpenSky Quota Status",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "opensky_quota_status", "refId": "A"}],
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {"type": "value", "options": {"0": {"text": "OK", "color": "green"}}},
+            {"type": "value", "options": {"1": {"text": "QUOTA EXCEEDED", "color": "red"}}}
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"value": null, "color": "green"}, {"value": 1, "color": "red"}]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 5},
+      "type": "row",
+      "title": "System resources"
+    },
+    {
+      "id": 4,
+      "gridPos": {"h": 5, "w": 8, "x": 0, "y": 6},
+      "type": "gauge",
+      "title": "CPU Usage (%)",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", "refId": "A"}],
+      "options": {"showThresholdLabels": false, "showThresholdMarkers": true},
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"value": null, "color": "green"}, {"value": 75, "color": "yellow"}, {"value": 90, "color": "red"}]
+          },
+          "unit": "percent"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "gridPos": {"h": 5, "w": 8, "x": 8, "y": 6},
+      "type": "gauge",
+      "title": "RAM Usage (%)",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))", "refId": "A"}],
+      "options": {"showThresholdLabels": false, "showThresholdMarkers": true},
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"value": null, "color": "green"}, {"value": 75, "color": "yellow"}, {"value": 90, "color": "red"}]
+          },
+          "unit": "percent"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "gridPos": {"h": 5, "w": 8, "x": 16, "y": 6},
+      "type": "stat",
+      "title": "Load Average (1m)",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "node_load1", "refId": "A"}],
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {"defaults": {"decimals": 2}}
+    },
+    {
+      "id": 7,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 12},
+      "type": "row",
+      "title": "Docker containers"
+    },
+    {
+      "id": 8,
+      "gridPos": {"h": 12, "w": 12, "x": 0, "y": 13},
+      "type": "timeseries",
+      "title": "CPU Usage (%) per Container",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "rate(container_cpu_usage_seconds_total{name=~\"api|postgres|scheduler|worker|mlflow|redis|selenium\"}[5m]) * 100", "refId": "A", "legendFormat": "{{name}}"}],
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"]}},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10},
+          "unit": "percent",
+          "min": 0
+        }
+      }
+    },
+    {
+      "id": 9,
+      "gridPos": {"h": 12, "w": 12, "x": 12, "y": 13},
+      "type": "timeseries",
+      "title": "RAM Usage (%) per Container",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "container_memory_working_set_bytes{name=~\"api|postgres|scheduler|worker|mlflow|redis|selenium\"} / 1024 / 1024", "refId": "A", "legendFormat": "{{name}}"}],
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"]}},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10},
+          "unit": "decmbytes",
+          "min": 0
+        }
+      }
+    },
+    {
+      "id": 10,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 21},
+      "type": "row",
+      "title": "PostgreSQL database"
+    },
+    {
+      "id": 11,
+      "gridPos": {"h": 5, "w": 8, "x": 0, "y": 22},
+      "type": "stat",
+      "title": "Active Connections",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "pg_stat_database_numbackends{datname=\"airlines\"}", "refId": "A"}],
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}}
+    },
+    {
+      "id": 12,
+      "gridPos": {"h": 5, "w": 8, "x": 8, "y": 22},
+      "type": "stat",
+      "title": "Database Size",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "pg_database_size_bytes{datname=\"airlines\"} / 1024 / 1024", "refId": "A"}],
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "decmbytes",
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"value": null, "color": "green"}, {"value": 5000, "color": "yellow"}, {"value": 10000, "color": "red"}]
+          }
+        }
+      }
+    },
+    {
+      "id": 13,
+      "gridPos": {"h": 5, "w": 8, "x": 16, "y": 22},
+      "type": "gauge",
+      "title": "Cache Hit Ratio",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "100 * (sum(pg_stat_database_blks_hit{datname=\"airlines\"}) / (sum(pg_stat_database_blks_hit{datname=\"airlines\"}) + sum(pg_stat_database_blks_read{datname=\"airlines\"})))", "refId": "A"}],
+      "options": {"showThresholdLabels": false, "showThresholdMarkers": true},
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"value": null, "color": "red"}, {"value": 70, "color": "yellow"}, {"value": 90, "color": "green"}]
+          },
+          "unit": "percent"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 28},
+      "type": "row",
+      "title": "FastAPI service"
+    },
+    {
+      "id": 15,
+      "gridPos": {"h": 12, "w": 20, "x": 0, "y": 29},
+      "type": "timeseries",
+      "title": "Requests per Second",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "rate(http_requests_total[5m])", "refId": "A", "legendFormat": "{{method}} {{handler}}"}],
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "mean"]}},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 0},
+          "unit": "reqps",
+          "min": 0
+        }
+      }
+    },
+    {
+      "id": 16,
+      "gridPos": {"h": 12, "w": 4, "x": 24, "y": 29},
+      "type": "bargauge",
+      "title": "Latency P95",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "avg(histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))) * 1000", "refId": "A"}],
+      "options": {"showThresholdLabels": false, "showThresholdMarkers": true, "displayMode": "lcd", "orientation": "vertical"},
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 1000,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"value": null, "color": "green"}, {"value": 200, "color": "yellow"}, {"value": 500, "color": "red"}]
+          },
+          "unit": "ms",
+          "decimals": 0
+        }
+      }
+    }
+  ],
+  "templating": {"list": []},
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "liveNow": false,
+  "time": {"from": "now-6h", "to": "now"},
+  "timepicker": {}
+}

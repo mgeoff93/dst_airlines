@@ -1,0 +1,225 @@
+{
+  "title": "4 - ML Performance",
+  "uid": "ml_performance",
+  "tags": ["machine learning", "model", "airlines"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+      "type": "row",
+      "title": "Model scores"
+    },
+    {
+      "id": 2,
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 1},
+      "type": "gauge",
+      "title": "R2 score (production)",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "ml_model_r2_score{status=\"production\"} or vector(0)", "refId": "A"}],
+      "options": {"showThresholdLabels": false, "showThresholdMarkers": true},
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"value": null, "color": "red"}, {"value": 0.6, "color": "yellow"}, {"value": 0.8, "color": "green"}]
+          },
+          "unit": "percentunit",
+          "decimals": 3
+        }
+      }
+    },
+    {
+      "id": 3,
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 1},
+      "type": "gauge",
+      "title": "R2 score (challenger)",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "ml_model_r2_score{status=\"challenger\"} or vector(0)", "refId": "A"}],
+      "options": {"showThresholdLabels": false, "showThresholdMarkers": true},
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"value": null, "color": "red"}, {"value": 0.6, "color": "yellow"}, {"value": 0.8, "color": "green"}]
+          },
+          "unit": "percentunit",
+          "decimals": 3
+        }
+      }
+    },
+    {
+      "id": 4,
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 1},
+      "type": "gauge",
+      "title": "MAE (production)",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "ml_model_mae{status=\"production\"} or vector(0)", "refId": "A"}],
+      "options": {"showThresholdLabels": false, "showThresholdMarkers": true},
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"value": null, "color": "green"}, {"value": 15, "color": "yellow"}, {"value": 30, "color": "red"}]
+          },
+          "unit": "m",
+          "decimals": 1
+        }
+      }
+    },
+    {
+      "id": 5,
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 1},
+      "type": "gauge",
+      "title": "MAE (challenger)",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "ml_model_mae{status=\"challenger\"} or vector(0)", "refId": "A"}],
+      "options": {"showThresholdLabels": false, "showThresholdMarkers": true},
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"value": null, "color": "green"}, {"value": 15, "color": "yellow"}, {"value": 30, "color": "red"}]
+          },
+          "unit": "m",
+          "decimals": 1
+        }
+      }
+    },
+    {
+      "id": 6,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 7},
+      "type": "row",
+      "title": "Model evolution"
+    },
+    {
+      "id": 7,
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+      "type": "timeseries",
+      "title": "R2 and MAE evolution (production)",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [
+        {"expr": "ml_model_r2_score{status=\"production\"}", "refId": "A", "legendFormat": "R2 score"},
+        {"expr": "ml_model_mae{status=\"production\"} / 100", "refId": "B", "legendFormat": "MAE (scaled /100)"}
+      ],
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "mean"]}},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10},
+          "decimals": 3
+        },
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "R2 score"}, "properties": [{"id": "custom.axisPlacement", "value": "left"}]},
+          {"matcher": {"id": "byName", "options": "MAE (scaled /100)"}, "properties": [{"id": "custom.axisPlacement", "value": "right"}]}
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 16},
+      "type": "row",
+      "title": "Predictions"
+    },
+    {
+      "id": 9,
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 17},
+      "type": "heatmap",
+      "title": "Prediction distribution",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "rate(api_prediction_output_value_bucket[5m]) or vector(0)", "refId": "A", "format": "heatmap", "legendFormat": "{{le}}"}],
+      "options": {
+        "calculate": false,
+        "cellGap": 2,
+        "color": {"scheme": "Spectral"}
+      },
+      "fieldConfig": {"defaults": {"custom": {"scaleDistribution": {"type": "linear"}}}}
+    },
+    {
+      "id": 10,
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 17},
+      "type": "stat",
+      "title": "Total predictions",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "sum(api_predictions_total) or vector(0)", "refId": "A"}],
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}}
+    },
+    {
+      "id": 11,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 25},
+      "type": "row",
+      "title": "Operational metrics"
+    },
+    {
+      "id": 12,
+      "gridPos": {"h": 6, "w": 8, "x": 0, "y": 26},
+      "type": "gauge",
+      "title": "Inference latency P95",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "histogram_quantile(0.95, rate(ml_model_inference_latency_ms_bucket[5m])) or vector(0)", "refId": "A"}],
+      "options": {"showThresholdLabels": false, "showThresholdMarkers": true},
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 500,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"value": null, "color": "green"}, {"value": 100, "color": "yellow"}, {"value": 200, "color": "red"}]
+          },
+          "unit": "ms",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "id": 13,
+      "gridPos": {"h": 6, "w": 8, "x": 8, "y": 26},
+      "type": "stat",
+      "title": "Training duration",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "ml_dag_training_duration_seconds or vector(0)", "refId": "A"}],
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {"defaults": {"unit": "s", "decimals": 1, "color": {"mode": "palette-classic"}}}
+    },
+    {
+      "id": 14,
+      "gridPos": {"h": 6, "w": 8, "x": 16, "y": 26},
+      "type": "stat",
+      "title": "Training dataset size",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "ml_training_rows_count or vector(0)", "refId": "A"}],
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "palette-classic"}}}
+    }
+  ],
+  "templating": {"list": []},
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "liveNow": false,
+  "time": {"from": "now-3h", "to": "now"},
+  "timepicker": {}
+}
