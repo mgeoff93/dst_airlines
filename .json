@@ -218,13 +218,13 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "stepBefore",
+            "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "auto",
+            "showPoints": "always",
             "showValues": false,
             "spanNulls": true,
             "stacking": {
@@ -421,6 +421,43 @@
           "color": {
             "mode": "palette-classic"
           },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.5,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "log": 2,
+              "type": "log"
+            },
+            "showPoints": "always",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "displayName": "${__field.labels.table}",
+          "fieldMinMax": false,
           "mappings": [],
           "min": 0,
           "thresholds": {
@@ -440,56 +477,43 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
-        "w": 16,
+        "h": 10,
+        "w": 24,
         "x": 0,
         "y": 24
       },
-      "id": 6,
+      "id": 23,
       "options": {
-        "displayMode": "gradient",
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        },
-        "maxVizHeight": 300,
-        "minVizHeight": 16,
-        "minVizWidth": 8,
-        "namePlacement": "auto",
-        "orientation": "horizontal",
-        "reduceOptions": {
           "calcs": [
+            "min",
+            "max",
+            "mean",
+            "sum",
             "lastNotNull"
           ],
-          "fields": "",
-          "values": false
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showUnfilled": true,
-        "sizing": "auto",
-        "valueMode": "color"
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "pluginVersion": "12.3.1",
       "targets": [
         {
-          "expr": "increase(etl_loaded_rows_total{table=\"static\"}[24h]) or vector(0)",
-          "legendFormat": "Static",
+          "editorMode": "code",
+          "expr": "etl_loaded_rows_run",
+          "legendFormat": "__auto",
+          "range": true,
           "refId": "A"
-        },
-        {
-          "expr": "increase(etl_loaded_rows_total{table=\"dynamic\"}[24h]) or vector(0)",
-          "legendFormat": "Dynamic",
-          "refId": "B"
-        },
-        {
-          "expr": "increase(etl_loaded_rows_total{table=\"live\"}[24h]) or vector(0)",
-          "legendFormat": "Live",
-          "refId": "C"
         }
       ],
-      "title": "Rows loaded (24h)",
-      "type": "bargauge"
+      "title": "Ingestion throughput per run",
+      "type": "timeseries"
     },
     {
       "collapsed": false,
@@ -497,7 +521,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 30
+        "y": 34
       },
       "id": 8,
       "panels": [],
@@ -540,7 +564,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 31
+        "y": 35
       },
       "id": 9,
       "options": {
@@ -601,7 +625,7 @@
         "h": 6,
         "w": 8,
         "x": 8,
-        "y": 31
+        "y": 35
       },
       "id": 10,
       "options": {
@@ -661,7 +685,7 @@
         "h": 6,
         "w": 8,
         "x": 16,
-        "y": 31
+        "y": 35
       },
       "id": 11,
       "options": {
@@ -697,7 +721,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 37
+        "y": 41
       },
       "id": 12,
       "panels": [],
@@ -750,7 +774,7 @@
         "h": 6,
         "w": 6,
         "x": 0,
-        "y": 38
+        "y": 42
       },
       "id": 13,
       "options": {
@@ -817,7 +841,7 @@
         "h": 6,
         "w": 6,
         "x": 6,
-        "y": 38
+        "y": 42
       },
       "id": 14,
       "options": {
@@ -882,7 +906,7 @@
         "h": 6,
         "w": 6,
         "x": 12,
-        "y": 38
+        "y": 42
       },
       "id": 15,
       "options": {
@@ -947,7 +971,7 @@
         "h": 6,
         "w": 6,
         "x": 18,
-        "y": 38
+        "y": 42
       },
       "id": 16,
       "options": {
@@ -981,7 +1005,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 44
+        "y": 48
       },
       "id": 17,
       "panels": [],
@@ -1055,7 +1079,7 @@
         "h": 6,
         "w": 12,
         "x": 0,
-        "y": 45
+        "y": 49
       },
       "id": 18,
       "options": {
@@ -1107,7 +1131,7 @@
         "h": 6,
         "w": 12,
         "x": 12,
-        "y": 45
+        "y": 49
       },
       "id": 19,
       "options": {
