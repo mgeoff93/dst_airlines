@@ -304,7 +304,7 @@
             "barAlignment": 0,
             "barWidthFactor": 0.5,
             "drawStyle": "bars",
-            "fillOpacity": 50,
+            "fillOpacity": 100,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -313,7 +313,7 @@
             },
             "insertNulls": false,
             "lineInterpolation": "linear",
-            "lineWidth": 1,
+            "lineWidth": 0,
             "pointSize": 4,
             "scaleDistribution": {
               "type": "linear"
@@ -329,24 +329,7 @@
               "mode": "off"
             }
           },
-          "displayName": "${__field.labels.type}",
-          "mappings": [
-            {
-              "options": {
-                "type=\"direct\"": {
-                  "color": "semi-dark-green",
-                  "index": 0,
-                  "text": "No scrape needed"
-                },
-                "type=\"scrape\"": {
-                  "color": "semi-dark-orange",
-                  "index": 1,
-                  "text": "Scrape needed"
-                }
-              },
-              "type": "value"
-            }
-          ],
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -357,7 +340,46 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "{__name__=\"etl_triage_run\", job=\"airflow_dag_etl\", type=\"direct\"}"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "No scraping needed"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "{__name__=\"etl_triage_run\", job=\"airflow_dag_etl\", type=\"scrape\"}"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Scraping needed"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -395,7 +417,7 @@
           "refId": "A"
         }
       ],
-      "title": "Triage Distribution (%)",
+      "title": "Triage distribution (%)",
       "type": "timeseries"
     },
     {
@@ -410,6 +432,129 @@
       "panels": [],
       "title": "Data loading",
       "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "purple",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "live"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Live"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "dynamic"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Dynamic"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "static"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Static"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 9,
+        "x": 0,
+        "y": 24
+      },
+      "id": 24,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum by (table) (increase(etl_loaded_rows_run[24h]))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Total rows ingested",
+      "type": "stat"
     },
     {
       "datasource": {
@@ -456,7 +601,6 @@
               "mode": "off"
             }
           },
-          "displayName": "${__field.labels.table}",
           "fieldMinMax": false,
           "mappings": [],
           "min": 0,
@@ -474,12 +618,70 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "{__name__=\"etl_loaded_rows_run\", job=\"airflow_dag_etl\", table=\"dynamic\"}"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Dynamic"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "{__name__=\"etl_loaded_rows_run\", job=\"airflow_dag_etl\", table=\"live\"}"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Live"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "{__name__=\"etl_loaded_rows_run\", job=\"airflow_dag_etl\", table=\"static\"}"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Static"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
+        "h": 11,
+        "w": 15,
+        "x": 9,
         "y": 24
       },
       "id": 23,
@@ -521,7 +723,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 34
+        "y": 35
       },
       "id": 8,
       "panels": [],
@@ -564,7 +766,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 35
+        "y": 36
       },
       "id": 9,
       "options": {
@@ -625,7 +827,7 @@
         "h": 6,
         "w": 8,
         "x": 8,
-        "y": 35
+        "y": 36
       },
       "id": 10,
       "options": {
@@ -685,7 +887,7 @@
         "h": 6,
         "w": 8,
         "x": 16,
-        "y": 35
+        "y": 36
       },
       "id": 11,
       "options": {
@@ -721,7 +923,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 41
+        "y": 42
       },
       "id": 12,
       "panels": [],
@@ -774,7 +976,7 @@
         "h": 6,
         "w": 6,
         "x": 0,
-        "y": 42
+        "y": 43
       },
       "id": 13,
       "options": {
@@ -841,7 +1043,7 @@
         "h": 6,
         "w": 6,
         "x": 6,
-        "y": 42
+        "y": 43
       },
       "id": 14,
       "options": {
@@ -906,7 +1108,7 @@
         "h": 6,
         "w": 6,
         "x": 12,
-        "y": 42
+        "y": 43
       },
       "id": 15,
       "options": {
@@ -971,7 +1173,7 @@
         "h": 6,
         "w": 6,
         "x": 18,
-        "y": 42
+        "y": 43
       },
       "id": 16,
       "options": {
@@ -1005,7 +1207,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 48
+        "y": 49
       },
       "id": 17,
       "panels": [],
@@ -1079,7 +1281,7 @@
         "h": 6,
         "w": 12,
         "x": 0,
-        "y": 49
+        "y": 50
       },
       "id": 18,
       "options": {
@@ -1131,7 +1333,7 @@
         "h": 6,
         "w": 12,
         "x": 12,
-        "y": 49
+        "y": 50
       },
       "id": 19,
       "options": {
