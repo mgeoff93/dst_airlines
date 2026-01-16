@@ -5,187 +5,524 @@
   "timezone": "browser",
   "schemaVersion": 38,
   "version": 1,
-  "refresh": "30s",
+  "refresh": "5s",
   "panels": [
     {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "id": 1,
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
-      "type": "row",
-      "title": "Model comparison"
+      "panels": [],
+      "title": "Model comparison",
+      "type": "row"
     },
     {
-      "id": 2,
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 1},
-      "type": "bargauge",
-      "title": "R2 score",
-      "datasource": {"type": "prometheus", "uid": "Prometheus"},
-      "targets": [
-        {"expr": "ml_model_r2_score{status=\"production\"} or vector(0)", "refId": "A", "legendFormat": "Production"},
-        {"expr": "ml_model_r2_score{status=\"challenger\"} or vector(0)", "refId": "B", "legendFormat": "Challenger"}
-      ],
-      "options": {
-        "orientation": "horizontal",
-        "displayMode": "gradient",
-        "showUnfilled": true
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
       },
       "fieldConfig": {
         "defaults": {
-          "min": 0,
-          "max": 1,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {"value": null, "color": "red"},
-              {"value": 0.6, "color": "yellow"},
-              {"value": 0.8, "color": "green"}
-            ]
-          },
-          "unit": "percentunit",
           "decimals": 3,
-          "noValue": "No model"
-        }
-      }
-    },
-    {
-      "id": 3,
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 1},
-      "type": "bargauge",
-      "title": "MAE (minutes)",
-      "datasource": {"type": "prometheus", "uid": "Prometheus"},
-      "targets": [
-        {"expr": "ml_model_mae{status=\"production\"} or vector(0)", "refId": "A", "legendFormat": "Production"},
-        {"expr": "ml_model_mae{status=\"challenger\"} or vector(0)", "refId": "B", "legendFormat": "Challenger"}
-      ],
-      "options": {
-        "orientation": "horizontal",
-        "displayMode": "gradient",
-        "showUnfilled": true
-      },
-      "fieldConfig": {
-        "defaults": {
+          "mappings": [],
+          "max": 1,
           "min": 0,
+          "noValue": "No model",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"value": null, "color": "green"},
-              {"value": 15, "color": "yellow"},
-              {"value": 30, "color": "red"}
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 0.8
+              },
+              {
+                "color": "green",
+                "value": 0.95
+              }
             ]
           },
-          "unit": "m",
-          "decimals": 1,
-          "noValue": "No model"
-        }
-      }
-    },
-    {
-      "id": 4,
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 9},
-      "type": "row",
-      "title": "Evolution"
-    },
-    {
-      "id": 5,
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 10},
-      "type": "timeseries",
-      "title": "Model metrics over time",
-      "datasource": {"type": "prometheus", "uid": "Prometheus"},
-      "targets": [
-        {"expr": "ml_model_r2_score{status=\"production\"}", "refId": "A", "legendFormat": "R2 (prod)"},
-        {"expr": "ml_model_mae{status=\"production\"} / 100", "refId": "B", "legendFormat": "MAE /100 (prod)"}
-      ],
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "id": 2,
       "options": {
-        "legend": {"displayMode": "list", "placement": "bottom"}
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "ml_model_r2_score{status=\"production\"}",
+          "legendFormat": "Production",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "ml_model_r2_score{status=\"challenger\"}",
+          "legendFormat": "Challenger",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "R2 Score",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "fillOpacity": 15,
-            "lineWidth": 2
+          "decimals": 1,
+          "mappings": [],
+          "min": 0,
+          "noValue": "No model",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 15
+              },
+              {
+                "color": "red",
+                "value": 30
+              }
+            ]
           },
-          "noValue": "No history"
+          "unit": "m"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "id": 3,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "ml_model_mae{status=\"production\"}",
+          "legendFormat": "Production",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "ml_model_mae{status=\"challenger\"}",
+          "legendFormat": "Challenger",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "MAE (min)",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 1,
+          "mappings": [],
+          "min": 0,
+          "noValue": "No model",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 15
+              },
+              {
+                "color": "red",
+                "value": 30
+              }
+            ]
+          },
+          "unit": "m"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      },
+      "id": 10,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sqrt(ml_model_mse{status=\"production\"})",
+          "legendFormat": "Production",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sqrt(ml_model_mse{status=\"challenger\"})",
+          "legendFormat": "Challenger",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "RMSE (min)",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 1,
+          "mappings": [],
+          "min": 0,
+          "noValue": "No model",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "m"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      },
+      "id": 11,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "ml_model_max_error{status=\"production\"}",
+          "legendFormat": "Production",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "ml_model_max_error{status=\"challenger\"}",
+          "legendFormat": "Challenger",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Max Error (min)",
+      "type": "bargauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
+      "id": 4,
+      "panels": [],
+      "title": "Evolution",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "fillOpacity": 50,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineWidth": 3,
+            "spanNulls": false
+          },
+          "mappings": [],
+          "noValue": "No history",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
         },
         "overrides": [
-          {"matcher": {"id": "byRegexp", "options": "R2.*"}, "properties": [{"id": "custom.axisPlacement", "value": "left"}, {"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]},
-          {"matcher": {"id": "byRegexp", "options": "MAE.*"}, "properties": [{"id": "custom.axisPlacement", "value": "right"}, {"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]}
-        ]
-      }
-    },
-    {
-      "id": 6,
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 18},
-      "type": "row",
-      "title": "Operations"
-    },
-    {
-      "id": 7,
-      "gridPos": {"h": 6, "w": 8, "x": 0, "y": 19},
-      "type": "stat",
-      "title": "Predictions",
-      "datasource": {"type": "prometheus", "uid": "Prometheus"},
-      "targets": [{"expr": "sum(api_predictions_total) or vector(0)", "refId": "A"}],
-      "options": {
-        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
-        "textMode": "value",
-        "colorMode": "value",
-        "graphMode": "area"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "noValue": "No predictions"
-        }
-      }
-    },
-    {
-      "id": 8,
-      "gridPos": {"h": 6, "w": 8, "x": 8, "y": 19},
-      "type": "stat",
-      "title": "Latency P95",
-      "datasource": {"type": "prometheus", "uid": "Prometheus"},
-      "targets": [{"expr": "histogram_quantile(0.95, rate(ml_model_inference_latency_ms_bucket[5m])) or vector(0)", "refId": "A"}],
-      "options": {
-        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
-        "textMode": "value",
-        "colorMode": "value",
-        "graphMode": "area"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {"value": null, "color": "green"},
-              {"value": 100, "color": "yellow"},
-              {"value": 200, "color": "red"}
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "R2"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
             ]
           },
-          "unit": "ms",
-          "decimals": 0,
-          "noValue": "No data"
-        }
-      }
-    },
-    {
-      "id": 9,
-      "gridPos": {"h": 6, "w": 8, "x": 16, "y": 19},
-      "type": "stat",
-      "title": "Training size",
-      "datasource": {"type": "prometheus", "uid": "Prometheus"},
-      "targets": [{"expr": "ml_training_rows_count or vector(0)", "refId": "A"}],
-      "options": {
-        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
-        "textMode": "value",
-        "colorMode": "value",
-        "graphMode": "none"
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MAE"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RMSE"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Max Error"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "noValue": "No training"
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 5,
+      "options": {
+        "alignValue": "center",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "mergeValues": true,
+        "rowHeight": 0.65,
+        "showValue": "always",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
         }
-      }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "ml_model_r2_score{status=\"production\"}",
+          "legendFormat": "R2",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "ml_model_mae{status=\"production\"}",
+          "legendFormat": "MAE",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sqrt(ml_model_mse{status=\"production\"})",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "RMSE",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "expr": "ml_model_max_error{status=\"production\"}",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "Max Error",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Model Metrics Over Time",
+      "type": "state-timeline"
     }
   ],
   "templating": {"list": []},

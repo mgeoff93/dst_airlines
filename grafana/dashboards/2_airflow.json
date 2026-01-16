@@ -5,7 +5,7 @@
   "timezone": "browser",
   "schemaVersion": 38,
   "version": 1,
-  "refresh": "10s",
+  "refresh": "5s",
   "panels": [
     {
       "collapsed": false,
@@ -32,7 +32,7 @@
               "options": {
                 "from": 0,
                 "result": {
-                  "text": "DOWN"
+                  "text": "Down"
                 },
                 "to": 0
               },
@@ -42,7 +42,7 @@
               "options": {
                 "from": 1,
                 "result": {
-                  "text": "ACTIVE"
+                  "text": "Active"
                 },
                 "to": 999999
               },
