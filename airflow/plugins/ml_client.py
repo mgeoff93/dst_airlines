@@ -67,6 +67,8 @@ class MLClient:
 			df_features = df_features[df_features["arrival_difference"].between(-60, 300)]
 			df_features = self.optimize_memory(df_features)
 
+			logging.info(f"DEBUG: df_features shape: {df_features.shape}")
+
 			self.metric_training_rows.set(len(df_features))
 			self._push_metrics()
 

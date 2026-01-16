@@ -1,0 +1,375 @@
+{
+  "title": "3 - Data & ML Pipeline",
+  "uid": "data_and_ml_pipeline",
+  "tags": ["etl", "ml", "pipeline", "airlines"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+      "type": "row",
+      "title": "Data extraction"
+    },
+    {
+      "id": 2,
+      "gridPos": {"h": 6, "w": 8, "x": 0, "y": 1},
+      "type": "stat",
+      "title": "Flights extracted (24h)",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "increase(etl_extracted_flights_total[24h]) or vector(0)", "refId": "A"}],
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"}
+        }
+      }
+    },
+    {
+      "id": 3,
+      "gridPos": {"h": 6, "w": 8, "x": 8, "y": 1},
+      "type": "stat",
+      "title": "API errors (24h)",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "increase(etl_api_errors_total[24h]) or vector(0)", "refId": "A"}],
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": null, "color": "green"},
+              {"value": 10, "color": "yellow"},
+              {"value": 50, "color": "red"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "gridPos": {"h": 6, "w": 8, "x": 16, "y": 1},
+      "type": "gauge",
+      "title": "Extraction success rate",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "100 * (increase(etl_extracted_flights_total[24h]) / greatest(increase(etl_extracted_flights_total[24h]) + increase(etl_api_errors_total[24h]), 0.001))", "refId": "A"}],
+      "options": {"showThresholdLabels": false, "showThresholdMarkers": true},
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": null, "color": "red"},
+              {"value": 90, "color": "yellow"},
+              {"value": 98, "color": "green"}
+            ]
+          },
+          "unit": "percent",
+          "decimals": 1
+        }
+      }
+    },
+    {
+      "id": 5,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 7},
+      "type": "row",
+      "title": "Data loading"
+    },
+    {
+      "id": 6,
+      "gridPos": {"h": 6, "w": 16, "x": 0, "y": 8},
+      "type": "bargauge",
+      "title": "Rows loaded (24h)",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [
+        {"expr": "increase(etl_loaded_rows_total{table=\"static\"}[24h]) or vector(0)", "refId": "A", "legendFormat": "Static"},
+        {"expr": "increase(etl_loaded_rows_total{table=\"dynamic\"}[24h]) or vector(0)", "refId": "B", "legendFormat": "Dynamic"},
+        {"expr": "increase(etl_loaded_rows_total{table=\"live\"}[24h]) or vector(0)", "refId": "C", "legendFormat": "Live"}
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "color": {"mode": "palette-classic"}
+        }
+      }
+    },
+    {
+      "id": 7,
+      "gridPos": {"h": 6, "w": 8, "x": 16, "y": 8},
+      "type": "piechart",
+      "title": "Triage distribution",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [
+        {"expr": "etl_triage_total{type=\"scrape\"}", "refId": "A", "legendFormat": "Scraping"},
+        {"expr": "etl_triage_total{type=\"direct\"}", "refId": "B", "legendFormat": "Cached"}
+      ],
+      "options": {
+        "legend": {"displayMode": "list", "placement": "right", "values": ["percent"]},
+        "pieType": "donut",
+        "displayLabels": ["percent"]
+      }
+    },
+    {
+      "id": 8,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 14},
+      "type": "row",
+      "title": "Model training"
+    },
+    {
+      "id": 9,
+      "gridPos": {"h": 6, "w": 8, "x": 0, "y": 15},
+      "type": "stat",
+      "title": "Model last updated",
+      "description": "Time since last model update (production)",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "(time() - timestamp(ml_model_r2_score{status=\"production\"})) / 3600", "refId": "A"}],
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "h",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": null, "color": "green"},
+              {"value": 48, "color": "yellow"},
+              {"value": 96, "color": "red"}
+            ]
+          },
+          "noValue": "Never trained"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "gridPos": {"h": 6, "w": 8, "x": 8, "y": 15},
+      "type": "stat",
+      "title": "Training duration",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "ml_dag_training_duration_seconds or vector(0)", "refId": "A"}],
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 0,
+          "noValue": "No training"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "gridPos": {"h": 6, "w": 8, "x": 16, "y": 15},
+      "type": "stat",
+      "title": "Training dataset",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "ml_training_rows_count or vector(0)", "refId": "A"}],
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 21},
+      "type": "row",
+      "title": "Model performance"
+    },
+    {
+      "id": 13,
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 22},
+      "type": "stat",
+      "title": "Model status",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "api_model_load_status{model_alias=\"production\"}", "refId": "A"}],
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": null, "color": "red"},
+              {"value": 1, "color": "green"}
+            ]
+          },
+          "mappings": [
+            {"type": "value", "options": {"0": {"text": "ERROR"}}},
+            {"type": "value", "options": {"1": {"text": "LOADED"}}}
+          ],
+          "noValue": "Unknown"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 22},
+      "type": "gauge",
+      "title": "R2 score",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "ml_model_r2_score{status=\"production\"} or vector(0)", "refId": "A"}],
+      "options": {"showThresholdLabels": false, "showThresholdMarkers": true},
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": null, "color": "red"},
+              {"value": 0.7, "color": "yellow"},
+              {"value": 0.85, "color": "green"}
+            ]
+          },
+          "unit": "percentunit",
+          "decimals": 3,
+          "noValue": "No model"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 22},
+      "type": "gauge",
+      "title": "MAE",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "ml_model_mae{status=\"production\"} or vector(0)", "refId": "A"}],
+      "options": {"showThresholdLabels": false, "showThresholdMarkers": true},
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 30,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": null, "color": "green"},
+              {"value": 10, "color": "yellow"},
+              {"value": 20, "color": "red"}
+            ]
+          },
+          "unit": "m",
+          "decimals": 1,
+          "noValue": "No model"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 22},
+      "type": "gauge",
+      "title": "Inference latency",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "ml_model_inference_latency_ms{status=\"production\"} or vector(0)", "refId": "A"}],
+      "options": {"showThresholdLabels": false, "showThresholdMarkers": true},
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 200,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": null, "color": "green"},
+              {"value": 100, "color": "yellow"},
+              {"value": 150, "color": "red"}
+            ]
+          },
+          "unit": "ms",
+          "decimals": 0,
+          "noValue": "No data"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 28},
+      "type": "row",
+      "title": "Predictions (via PowerBI)"
+    },
+    {
+      "id": 18,
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 29},
+      "type": "timeseries",
+      "title": "Prediction requests",
+      "description": "Triggered when PowerBI dashboard is accessed",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "increase(api_predictions_total[5m]) or vector(0)", "refId": "A", "legendFormat": "Requests"}],
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80
+          },
+          "min": 0,
+          "color": {"mode": "palette-classic"}
+        }
+      }
+    },
+    {
+      "id": 19,
+      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 29},
+      "type": "heatmap",
+      "title": "Prediction distribution",
+      "description": "Distribution of predicted delays. Updates with PowerBI usage.",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "rate(api_prediction_output_value_bucket[5m])", "refId": "A", "format": "heatmap"}],
+      "options": {
+        "calculate": false,
+        "cellGap": 2,
+        "color": {"scheme": "Spectral"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No predictions yet"
+        }
+      }
+    }
+  ],
+  "templating": {"list": []},
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "liveNow": false,
+  "time": {"from": "now-24h", "to": "now"},
+  "timepicker": {}
+}
