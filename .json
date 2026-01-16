@@ -22,78 +22,12 @@
   "links": [],
   "panels": [
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "Prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 1,
-          "mappings": [],
-          "max": 100,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": 0
-              },
-              {
-                "color": "yellow",
-                "value": 90
-              },
-              {
-                "color": "green",
-                "value": 98
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 8,
-        "x": 4,
-        "y": 0
-      },
-      "id": 4,
-      "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "sizing": "auto"
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "100 * (increase(etl_extracted_flights_total[24h]) / greatest(increase(etl_extracted_flights_total[24h]) + increase(etl_api_errors_total[24h]), 0.001))",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Extraction success rate",
-      "type": "gauge"
-    },
-    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 6
+        "y": 0
       },
       "id": 1,
       "panels": [],
@@ -159,7 +93,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 7
+        "y": 1
       },
       "id": 20,
       "options": {
@@ -256,7 +190,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 15
+        "y": 9
       },
       "id": 21,
       "options": {
@@ -385,7 +319,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 15
+        "y": 9
       },
       "id": 22,
       "options": {
@@ -426,7 +360,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 23
+        "y": 17
       },
       "id": 5,
       "panels": [],
@@ -559,7 +493,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 24
+        "y": 18
       },
       "id": 23,
       "options": {
@@ -602,9 +536,126 @@
       "fieldConfig": {
         "defaults": {
           "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 0.1
+              },
+              {
+                "color": "green",
+                "value": 0.3
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Live positions"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Enriched routes"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 13,
+        "x": 0,
+        "y": 28
+      },
+      "id": 25,
+      "options": {
+        "displayMode": "lcd",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "manual",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\r\n  sum(increase(etl_loaded_rows_run{table=\"static\"}[1h])) \r\n  + \r\n  sum(increase(etl_loaded_rows_run{table=\"dynamic\"}[1h]))\r\n) \r\n/ 2 \r\n/ \r\nsum(increase(etl_loaded_rows_run{table=\"live\"}[1h]))",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Scraping and triage efficiency (last hour)",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
             "fixedColor": "purple",
             "mode": "fixed"
           },
+          "decimals": 1,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -618,7 +669,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "rows/m"
         },
         "overrides": [
           {
@@ -683,8 +735,8 @@
       "gridPos": {
         "h": 7,
         "w": 11,
-        "x": 0,
-        "y": 34
+        "x": 13,
+        "y": 28
       },
       "id": 24,
       "options": {
@@ -708,130 +760,14 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (table) (rate(etl_loaded_rows_run[5m])) * 60",
+          "expr": "sum by (table) (rate(etl_loaded_rows_run[1h])) * 60",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Total rows ingested (per min)",
+      "title": "Total rows ingested (last hour)",
       "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "Prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 0,
-          "mappings": [],
-          "max": 1,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": 0
-              },
-              {
-                "color": "yellow",
-                "value": 0.01
-              },
-              {
-                "color": "green",
-                "value": 0.05
-              }
-            ]
-          },
-          "unit": "percentunit"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Live positions"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "blue",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Enriched routes"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "purple",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 13,
-        "x": 11,
-        "y": 34
-      },
-      "id": 25,
-      "options": {
-        "displayMode": "lcd",
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        },
-        "maxVizHeight": 300,
-        "minVizHeight": 16,
-        "minVizWidth": 8,
-        "namePlacement": "auto",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showUnfilled": true,
-        "sizing": "manual",
-        "valueMode": "color"
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "Prometheus"
-          },
-          "editorMode": "code",
-          "expr": "(sum(increase(etl_loaded_rows_run{table=\"static\"}[1h])) + sum(increase(etl_loaded_rows_run{table=\"dynamic\"}[1h]))) / sum(increase(etl_loaded_rows_run{table=\"live\"}[1h]))",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "B"
-        }
-      ],
-      "title": "Enrichment ratio (last hour)",
-      "type": "bargauge"
     },
     {
       "collapsed": false,
@@ -839,7 +775,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 41
+        "y": 35
       },
       "id": 8,
       "panels": [],
@@ -882,7 +818,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 42
+        "y": 36
       },
       "id": 9,
       "options": {
@@ -943,7 +879,7 @@
         "h": 6,
         "w": 8,
         "x": 8,
-        "y": 42
+        "y": 36
       },
       "id": 10,
       "options": {
@@ -1003,7 +939,7 @@
         "h": 6,
         "w": 8,
         "x": 16,
-        "y": 42
+        "y": 36
       },
       "id": 11,
       "options": {
@@ -1039,7 +975,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 48
+        "y": 42
       },
       "id": 12,
       "panels": [],
@@ -1092,7 +1028,7 @@
         "h": 6,
         "w": 6,
         "x": 0,
-        "y": 49
+        "y": 43
       },
       "id": 13,
       "options": {
@@ -1159,7 +1095,7 @@
         "h": 6,
         "w": 6,
         "x": 6,
-        "y": 49
+        "y": 43
       },
       "id": 14,
       "options": {
@@ -1224,7 +1160,7 @@
         "h": 6,
         "w": 6,
         "x": 12,
-        "y": 49
+        "y": 43
       },
       "id": 15,
       "options": {
@@ -1289,7 +1225,7 @@
         "h": 6,
         "w": 6,
         "x": 18,
-        "y": 49
+        "y": 43
       },
       "id": 16,
       "options": {
@@ -1323,7 +1259,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 55
+        "y": 49
       },
       "id": 17,
       "panels": [],
@@ -1397,7 +1333,7 @@
         "h": 6,
         "w": 12,
         "x": 0,
-        "y": 56
+        "y": 50
       },
       "id": 18,
       "options": {
@@ -1449,7 +1385,7 @@
         "h": 6,
         "w": 12,
         "x": 12,
-        "y": 56
+        "y": 50
       },
       "id": 19,
       "options": {
