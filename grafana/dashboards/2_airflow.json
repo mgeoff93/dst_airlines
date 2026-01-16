@@ -8,206 +8,652 @@
   "refresh": "10s",
   "panels": [
     {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "id": 1,
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
-      "type": "row",
-      "title": "Overview"
+      "panels": [],
+      "title": "Overview",
+      "type": "row"
     },
     {
-      "id": 2,
-      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 1},
-      "type": "stat",
-      "title": "Scheduler",
-      "datasource": {"type": "prometheus", "uid": "Prometheus"},
-      "targets": [{"expr": "airflow_scheduler_heartbeat", "refId": "A"}],
-      "options": {
-        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
-        "textMode": "value",
-        "colorMode": "background",
-        "graphMode": "none"
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
       },
       "fieldConfig": {
         "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [{"value": null, "color": "red"}, {"value": 1, "color": "green"}]
-          },
           "mappings": [
-            {"type": "range", "options": {"from": 0, "to": 0, "result": {"text": "DOWN"}}},
-            {"type": "range", "options": {"from": 1, "to": 999999, "result": {"text": "ACTIVE"}}}
-          ]
-        }
-      }
-    },
-    {
-      "id": 3,
-      "gridPos": {"h": 8, "w": 18, "x": 6, "y": 1},
-      "type": "timeseries",
-      "title": "Executor activity",
-      "datasource": {"type": "prometheus", "uid": "Prometheus"},
-      "targets": [
-        {"expr": "airflow_executor_running_tasks", "refId": "A", "legendFormat": "Running"},
-        {"expr": "airflow_executor_queued_tasks", "refId": "B", "legendFormat": "Queued"},
-        {"expr": "airflow_executor_open_slots", "refId": "C", "legendFormat": "Free slots"}
-      ],
-      "options": {
-        "legend": {"displayMode": "list", "placement": "bottom"}
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "fillOpacity": 15,
-            "lineWidth": 2
-          },
-          "min": 0
-        }
-      }
-    },
-    {
-      "id": 4,
-      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 5},
-      "type": "stat",
-      "title": "Success rate",
-      "datasource": {"type": "prometheus", "uid": "Prometheus"},
-      "targets": [{"expr": "100 * (airflow_dagrun_duration_success_count / greatest(airflow_dagrun_duration_success_count + (airflow_dagrun_duration_failed_count or vector(0)), 1))", "refId": "A"}],
-      "options": {
-        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
-        "textMode": "value",
-        "colorMode": "value",
-        "graphMode": "none"
-      },
-      "fieldConfig": {
-        "defaults": {
+            {
+              "options": {
+                "from": 0,
+                "result": {
+                  "text": "DOWN"
+                },
+                "to": 0
+              },
+              "type": "range"
+            },
+            {
+              "options": {
+                "from": 1,
+                "result": {
+                  "text": "ACTIVE"
+                },
+                "to": 999999
+              },
+              "type": "range"
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"value": null, "color": "red"},
-              {"value": 95, "color": "green"}
-            ]
-          },
-          "unit": "percent",
-          "decimals": 1
-        }
-      }
-    },
-    {
-      "id": 5,
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 9},
-      "type": "row",
-      "title": "DAG performance"
-    },
-    {
-      "id": 6,
-      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 10},
-      "type": "timeseries",
-      "title": "DAG duration",
-      "datasource": {"type": "prometheus", "uid": "Prometheus"},
-      "targets": [
-        {"expr": "airflow_dagrun_duration_success_etl_sum / airflow_dagrun_duration_success_etl_count", "refId": "A", "legendFormat": "ETL"},
-        {"expr": "airflow_dagrun_duration_success_model_sum / airflow_dagrun_duration_success_model_count", "refId": "B", "legendFormat": "Model"}
-      ],
-      "options": {
-        "legend": {"displayMode": "list", "placement": "bottom"}
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "fillOpacity": 0,
-            "lineWidth": 2
-          },
-          "unit": "s",
-          "min": 0
-        }
-      }
-    },
-    {
-      "id": 7,
-      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 10},
-      "type": "timeseries",
-      "title": "Task execution",
-      "datasource": {"type": "prometheus", "uid": "Prometheus"},
-      "targets": [
-        {"expr": "rate(airflow_dagrun_duration_success_count[5m]) * 60", "refId": "A", "legendFormat": "Success/min"},
-        {"expr": "rate(airflow_dagrun_duration_failed_count[5m]) * 60 or vector(0)", "refId": "B", "legendFormat": "Failed/min"}
-      ],
-      "options": {
-        "legend": {"displayMode": "list", "placement": "bottom"}
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "bars",
-            "fillOpacity": 80
-          },
-          "min": 0
-        },
-        "overrides": [
-          {"matcher": {"id": "byName", "options": "Success/min"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]},
-          {"matcher": {"id": "byName", "options": "Failed/min"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]}
-        ]
-      }
-    },
-    {
-      "id": 8,
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 16},
-      "type": "row",
-      "title": "Selenium pool"
-    },
-    {
-      "id": 9,
-      "gridPos": {"h": 6, "w": 16, "x": 0, "y": 17},
-      "type": "timeseries",
-      "title": "Pool usage",
-      "datasource": {"type": "prometheus", "uid": "Prometheus"},
-      "targets": [
-        {"expr": "airflow_pool_running_slots_selenium_pool", "refId": "A", "legendFormat": "Running"},
-        {"expr": "airflow_pool_open_slots_selenium_pool", "refId": "B", "legendFormat": "Available"}
-      ],
-      "options": {
-        "legend": {"displayMode": "list", "placement": "bottom"}
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "fillOpacity": 25,
-            "stacking": {"mode": "normal"}
-          },
-          "min": 0,
-          "max": 4
-        }
-      }
-    },
-    {
-      "id": 10,
-      "gridPos": {"h": 6, "w": 8, "x": 16, "y": 17},
-      "type": "stat",
-      "title": "Starving tasks",
-      "datasource": {"type": "prometheus", "uid": "Prometheus"},
-      "targets": [{"expr": "airflow_pool_starving_tasks_selenium_pool", "refId": "A"}],
-      "options": {
-        "reduceOptions": {"values": false, "calcs": ["lastNotNull"]},
-        "textMode": "value",
-        "colorMode": "background",
-        "graphMode": "area"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {"value": null, "color": "green"},
-              {"value": 1, "color": "yellow"},
-              {"value": 5, "color": "red"}
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 0,
+        "y": 1
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "expr": "airflow_scheduler_heartbeat",
+          "refId": "A"
         }
-      }
+      ],
+      "title": "Scheduler",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 20,
+        "x": 4,
+        "y": 1
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "expr": "airflow_executor_running_tasks",
+          "legendFormat": "Running",
+          "refId": "A"
+        },
+        {
+          "expr": "airflow_executor_queued_tasks",
+          "legendFormat": "Queued",
+          "refId": "B"
+        },
+        {
+          "expr": "airflow_executor_open_slots",
+          "legendFormat": "Free slots",
+          "refId": "C"
+        }
+      ],
+      "title": "Executor activity",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 1,
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 95
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 0,
+        "y": 4
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "100 * (airflow_dagrun_duration_success_count/((airflow_dagrun_duration_success_count + (airflow_dagrun_duration_failed_count or vector(0))) or vector(1)))",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Success rate",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "id": 5,
+      "panels": [],
+      "title": "DAG performance",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 0,
+        "y": 10
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "percentChangeColorMode": "inverted",
+        "reduceOptions": {
+          "calcs": [
+            "mean"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": true,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "expr": "airflow_dagrun_duration_success_etl_sum / airflow_dagrun_duration_success_etl_count",
+          "legendFormat": "ETL",
+          "refId": "A"
+        },
+        {
+          "expr": "airflow_dagrun_duration_success_model_sum / airflow_dagrun_duration_success_model_count",
+          "legendFormat": "Model",
+          "refId": "B"
+        }
+      ],
+      "title": "DAG duration",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Success/min"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failed/min"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 20,
+        "x": 4,
+        "y": 10
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "rate(airflow_dagrun_duration_success_count[5m]) * 60",
+          "legendFormat": "Success",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "rate(airflow_dagrun_duration_failed_count[5m]) * 60",
+          "legendFormat": "Failed",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Task execution",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "id": 8,
+      "panels": [],
+      "title": "Selenium pool",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 25,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "max": 4,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 20,
+        "x": 0,
+        "y": 19
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "expr": "airflow_pool_running_slots_selenium_pool",
+          "legendFormat": "Running",
+          "refId": "A"
+        },
+        {
+          "expr": "airflow_pool_open_slots_selenium_pool",
+          "legendFormat": "Available",
+          "refId": "B"
+        }
+      ],
+      "title": "Pool usage",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 20,
+        "y": 19
+      },
+      "id": 10,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "expr": "airflow_pool_starving_tasks_selenium_pool",
+          "refId": "A"
+        }
+      ],
+      "title": "Starving tasks",
+      "type": "stat"
     }
   ],
   "templating": {"list": []},

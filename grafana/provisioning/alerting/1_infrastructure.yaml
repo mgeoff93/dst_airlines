@@ -1,0 +1,449 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Infrastructure Alerts
+    folder: Infrastructure
+    interval: 1m
+    rules:
+      # Critical Alerts
+      - uid: opensky_quota_exceeded
+        title: OpenSky API Quota Exceeded
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: Prometheus
+            model:
+              expr: opensky_quota_status
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  type: query
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          description: "OpenSky API quota has been exceeded. Data extraction will be blocked until quota resets."
+          summary: "OpenSky quota exceeded"
+        labels:
+          severity: critical
+          team: data-engineering
+
+      # System Resource Alerts
+      - uid: high_cpu_usage
+        title: High CPU Usage
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: Prometheus
+            model:
+              expr: 100 - (avg(irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params: [90]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  type: query
+              refId: C
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          description: "CPU usage is above 90% for more than 5 minutes. Current value: {{ $values.B.Value }}%"
+          summary: "High CPU usage detected"
+        labels:
+          severity: warning
+          team: infrastructure
+
+      - uid: high_ram_usage
+        title: High RAM Usage
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: Prometheus
+            model:
+              expr: 100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params: [90]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  type: query
+              refId: C
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          description: "RAM usage is above 90% for more than 5 minutes. Current value: {{ $values.B.Value }}%"
+          summary: "High RAM usage detected"
+        labels:
+          severity: warning
+          team: infrastructure
+
+      # Container Resource Alerts
+      - uid: high_container_cpu
+        title: High Container CPU Usage
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: Prometheus
+            model:
+              expr: rate(container_cpu_usage_seconds_total{name=~"api|postgres|scheduler|worker|mlflow"}[5m]) * 100
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: max
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params: [80]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  type: query
+              refId: C
+        noDataState: NoData
+        execErrState: Error
+        for: 10m
+        annotations:
+          description: "A container is using more than 80% CPU for over 10 minutes. Check container {{ $labels.name }}"
+          summary: "High CPU usage in container"
+        labels:
+          severity: warning
+          team: infrastructure
+
+      # Database Alerts
+      - uid: high_db_connections
+        title: High Database Connection Count
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: Prometheus
+            model:
+              expr: pg_stat_database_numbackends{datname="airlines"}
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params: [20]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  type: query
+              refId: C
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          description: "PostgreSQL has {{ $values.B.Value }} active connections. Normal max is 20."
+          summary: "High number of database connections"
+        labels:
+          severity: warning
+          team: database
+
+      - uid: low_cache_hit_ratio
+        title: Low Database Cache Hit Ratio
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: Prometheus
+            model:
+              expr: 100 * (sum(pg_stat_database_blks_hit{datname="airlines"}) / (sum(pg_stat_database_blks_hit{datname="airlines"}) + sum(pg_stat_database_blks_read{datname="airlines"})))
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params: [90]
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  type: query
+              refId: C
+        noDataState: NoData
+        execErrState: Error
+        for: 10m
+        annotations:
+          description: "Database cache hit ratio is {{ $values.B.Value }}%, below optimal 90% threshold. Consider increasing shared_buffers."
+          summary: "Low database cache efficiency"
+        labels:
+          severity: info
+          team: database
+
+      # API Performance Alerts
+      - uid: high_api_latency
+        title: High API Response Latency
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: Prometheus
+            model:
+              expr: avg(histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))) * 1000
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params: [500]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  type: query
+              refId: C
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          description: "API P95 latency is {{ $values.B.Value }}ms, above 500ms threshold. Users may experience slowness."
+          summary: "High API response time"
+        labels:
+          severity: warning
+          team: backend
+
+      - uid: low_api_traffic
+        title: Unusual Low API Traffic
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: Prometheus
+            model:
+              expr: sum(rate(http_requests_total[5m]))
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params: [0.01]
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  type: query
+              refId: C
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 10m
+        annotations:
+          description: "API is receiving less than 0.01 req/s. Service may be down or unreachable."
+          summary: "Very low or no API traffic"
+        labels:
+          severity: critical
+          team: backend
+
+# Contact points configuration
+contactPoints:
+  - orgId: 1
+    name: default-email
+    receivers:
+      - uid: default-email-receiver
+        type: email
+        settings:
+          addresses: admin@airlines.local
+        disableResolveMessage: false
+
+  - orgId: 1
+    name: critical-alerts
+    receivers:
+      - uid: critical-email
+        type: email
+        settings:
+          addresses: oncall@airlines.local
+        disableResolveMessage: false
+
+# Notification policies
+policies:
+  - orgId: 1
+    receiver: default-email
+    group_by: ['alertname', 'severity']
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+    routes:
+      - receiver: critical-alerts
+        object_matchers:
+          - ['severity', '=', 'critical']
+        group_wait: 10s
+        group_interval: 1m
+        repeat_interval: 30m
+        continue: false
