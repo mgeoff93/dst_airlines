@@ -29,6 +29,244 @@
       "fieldConfig": {
         "defaults": {
           "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "fillOpacity": 70,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineWidth": 0,
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 34,
+      "options": {
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "mergeValues": true,
+        "rowHeight": 0.5,
+        "showValue": "auto",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "ml_training_rows_count",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "New panel",
+      "type": "state-timeline"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "stepBefore",
+            "lineWidth": 1,
+            "pointSize": 8,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "always",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 7,
+        "x": 0,
+        "y": 8
+      },
+      "id": 33,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "ml_model_r2_score",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Model Evolution (30 Days)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 250,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 150
+              },
+              {
+                "color": "red",
+                "value": 200
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 7,
+        "x": 0,
+        "y": 16
+      },
+      "id": 32,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "ml_model_inference_latency_ms{status=\"challenger\"}",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Challenger Inference Speed",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
             "mode": "palette-classic"
           },
           "custom": {
@@ -67,27 +305,35 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": ""
+            },
+            "properties": []
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 0
+        "y": 24
       },
       "id": 31,
       "options": {
         "barRadius": 0,
-        "barWidth": 0.97,
+        "barWidth": 0.8,
         "fullHighlight": false,
-        "groupWidth": 0.7,
+        "groupWidth": 0.54,
         "legend": {
           "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
-        "orientation": "auto",
+        "orientation": "vertical",
         "showValue": "auto",
         "stacking": "none",
         "tooltip": {
@@ -167,7 +413,7 @@
         "h": 11,
         "w": 8,
         "x": 0,
-        "y": 0
+        "y": 32
       },
       "id": 29,
       "options": {
@@ -200,7 +446,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 11
+        "y": 43
       },
       "id": 1,
       "panels": [],
@@ -266,7 +512,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 12
+        "y": 44
       },
       "id": 20,
       "options": {
@@ -363,7 +609,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 20
+        "y": 52
       },
       "id": 21,
       "options": {
@@ -492,7 +738,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 20
+        "y": 52
       },
       "id": 22,
       "options": {
@@ -533,7 +779,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 60
       },
       "id": 5,
       "panels": [],
@@ -666,7 +912,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 29
+        "y": 61
       },
       "id": 23,
       "options": {
@@ -771,7 +1017,7 @@
         "h": 7,
         "w": 13,
         "x": 0,
-        "y": 39
+        "y": 71
       },
       "id": 25,
       "options": {
@@ -909,7 +1155,7 @@
         "h": 7,
         "w": 11,
         "x": 13,
-        "y": 39
+        "y": 71
       },
       "id": 24,
       "options": {
@@ -948,7 +1194,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 46
+        "y": 78
       },
       "id": 8,
       "panels": [],
@@ -987,7 +1233,7 @@
         "h": 7,
         "w": 3,
         "x": 0,
-        "y": 47
+        "y": 79
       },
       "id": 30,
       "options": {
@@ -1083,7 +1329,7 @@
         "h": 11,
         "w": 5,
         "x": 0,
-        "y": 54
+        "y": 86
       },
       "id": 27,
       "options": {
@@ -1168,7 +1414,7 @@
         "h": 6,
         "w": 6,
         "x": 0,
-        "y": 65
+        "y": 97
       },
       "id": 28,
       "options": {
@@ -1279,7 +1525,7 @@
         "h": 5,
         "w": 3,
         "x": 3,
-        "y": 78
+        "y": 110
       },
       "id": 10,
       "options": {
@@ -1334,7 +1580,7 @@
         "h": 5,
         "w": 3,
         "x": 0,
-        "y": 83
+        "y": 115
       },
       "id": 19,
       "options": {
@@ -1412,7 +1658,7 @@
         "h": 5,
         "w": 3,
         "x": 3,
-        "y": 83
+        "y": 115
       },
       "id": 11,
       "options": {
@@ -1448,7 +1694,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 71
+        "y": 103
       },
       "id": 17,
       "panels": [],
@@ -1522,7 +1768,7 @@
         "h": 6,
         "w": 12,
         "x": 0,
-        "y": 72
+        "y": 104
       },
       "id": 18,
       "options": {
@@ -1585,7 +1831,7 @@
         "h": 5,
         "w": 3,
         "x": 0,
-        "y": 78
+        "y": 110
       },
       "id": 9,
       "options": {
