@@ -100,14 +100,14 @@ def flight_data_pipeline():
 				current_static = postgrescli.get_static_flight(f["callsign"])
 				latest_dynamic = postgrescli.get_latest_dynamic_flight(f["callsign"], f["icao24"])
 				
-				is_incomplete = not current_static or not all([current_static.get("origin_code"), current_static.get("destination_code")])
+				is_incomplete = not current_static or not all([current_static.get("airline_name"), current_static.get("origin_code"), current_static.get("destination_code")])
 
 				if is_incomplete or postgrescli.needs_refresh(f["callsign"], f["icao24"], f["on_ground"]):
 					needs_scrape.append(f)
 				elif latest_dynamic:
 					lat, lon = f.get("latitude"), f.get("longitude")
 					if lat and lon: f.update(weathercli.get_weather(lat, lon))
-					f.update({"flight_date": latest_dynamic["flight_date"], "unique_key": latest_dynamic["unique_key"]})
+					f.update({"flight_date": latest_dynamic["flight_date"], "unique_key": latest_dynamic["unique_key"], "departure_scheduled": latest_dynamic["departure_scheduled"].strftime("%H:%M:%S") if latest_dynamic["departure_scheduled"] else None})
 					direct_live.append(f)
 
 			metric_triage.labels(type='scrape').set(len(needs_scrape))
