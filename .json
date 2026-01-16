@@ -729,20 +729,26 @@
           },
           "decimals": 0,
           "mappings": [],
+          "max": 1,
           "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "red",
                 "value": 0
               },
               {
-                "color": "red",
-                "value": 80
+                "color": "yellow",
+                "value": 0.01
+              },
+              {
+                "color": "green",
+                "value": 0.05
               }
             ]
-          }
+          },
+          "unit": "percentunit"
         },
         "overrides": [
           {
@@ -1512,5 +1518,5 @@
   "timezone": "browser",
   "title": "3 - Data & ML Pipeline",
   "uid": "data_and_ml_pipeline",
-  "version": 1
+  "version": 2
 }
