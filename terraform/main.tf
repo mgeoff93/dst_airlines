@@ -76,3 +76,7 @@ resource "docker_volume" "airflow_data" {
 resource "docker_volume" "grafana_data" {
   name = "grafana-data-terraform"
 }
+
+resource "docker_volume" "prometheus_data" {
+  name = "prometheus-data-terraform"
+}
