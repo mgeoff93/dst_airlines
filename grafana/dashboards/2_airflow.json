@@ -404,7 +404,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "increase(airflow_dagrun_duration_failed_etl_count[3h]) or vector(0)",
+          "expr": "increase(airflow_dagrun_duration_failed_etl_count[3h])",
           "legendFormat": "Failed",
           "range": true,
           "refId": "B"
