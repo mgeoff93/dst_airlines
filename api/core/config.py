@@ -9,4 +9,4 @@ POSTGRES_USER = os.getenv("POSTGRES_USER")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 
 # --- Autres constantes ---
-STALE_THRESHOLD = timedelta(minutes = 30)
+STALE_THRESHOLD = timedelta(hours = 2)
