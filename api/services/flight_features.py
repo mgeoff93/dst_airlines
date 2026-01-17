@@ -97,8 +97,7 @@ def build_flight_datasets(all_flights: pd.DataFrame) -> dict:
 		"departure_scheduled_ts", "departure_actual_ts",
 		"arrival_scheduled_ts", "arrival_actual_ts",
 		"departure_difference", "arrival_difference",
-		"last_update",
-		"_day_adjust_state", "_flight_duration_hours"
+		"last_update"
 	]
 	normalized = df[cols_to_keep].copy()
 
