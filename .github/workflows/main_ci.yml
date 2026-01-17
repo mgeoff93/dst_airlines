@@ -73,15 +73,31 @@ jobs:
         env:
           PGPASSWORD: password_test
         run: |
-          # On crée les tables minimales nécessaires pour que les SELECT ne plantent pas
-          # On ajoute '|| true' pour que même si le SQL rate, la CI continue
+          # 1. On crée les tables avec TOUTES les colonnes demandées par tes routers
           psql -h localhost -U user_test -d user_test -c "
-          CREATE TABLE IF NOT EXISTS flight_static (callsign VARCHAR PRIMARY KEY, airline_name VARCHAR, origin_code VARCHAR, destination_code VARCHAR, commercial_flight BOOLEAN);
-          CREATE TABLE IF NOT EXISTS flight_dynamic (callsign VARCHAR, icao24 VARCHAR, flight_date DATE, departure_scheduled TIME, departure_actual TIME, arrival_scheduled TIME, arrival_actual TIME, status VARCHAR, last_update TIMESTAMPTZ, unique_key TEXT PRIMARY KEY);
-          CREATE TABLE IF NOT EXISTS live_data (indice SERIAL, request_id UUID, callsign VARCHAR, icao24 VARCHAR, flight_date DATE, departure_scheduled TIME, unique_key TEXT REFERENCES flight_dynamic(unique_key), longitude DOUBLE PRECISION, latitude DOUBLE PRECISION, wind_speed DOUBLE PRECISION, CONSTRAINT pk_live_data PRIMARY KEY (request_id, unique_key));
-          " || true
+          CREATE TABLE IF NOT EXISTS flight_static (
+              callsign VARCHAR PRIMARY KEY, airline_name VARCHAR, 
+              origin_code VARCHAR, destination_code VARCHAR, commercial_flight BOOLEAN
+          );
+          CREATE TABLE IF NOT EXISTS flight_dynamic (
+              callsign VARCHAR, icao24 VARCHAR, flight_date DATE, 
+              departure_scheduled TIME, departure_actual TIME, 
+              arrival_scheduled TIME, arrival_actual TIME, 
+              status VARCHAR, last_update TIMESTAMPTZ, unique_key TEXT PRIMARY KEY
+          );
+          CREATE TABLE IF NOT EXISTS live_data (
+              indice SERIAL, request_id UUID, callsign VARCHAR, icao24 VARCHAR, 
+              flight_date DATE, departure_scheduled TIME, unique_key TEXT REFERENCES flight_dynamic(unique_key), 
+              longitude DOUBLE PRECISION, latitude DOUBLE PRECISION, baro_altitude DOUBLE PRECISION,
+              geo_altitude DOUBLE PRECISION, on_ground BOOLEAN, velocity DOUBLE PRECISION,
+              vertical_rate DOUBLE PRECISION, temperature DOUBLE PRECISION,
+              wind_speed DOUBLE PRECISION, gust_speed DOUBLE PRECISION, visibility DOUBLE PRECISION, 
+              cloud_coverage DOUBLE PRECISION, rain DOUBLE PRECISION, global_condition VARCHAR,
+              CONSTRAINT pk_live_data PRIMARY KEY (request_id, unique_key)
+          );
+          "
 
-          # On tente d'injecter ton seed, mais on ignore si ça rate (|| true)
+          # 2. On injecte les données de test sans s'arrêter sur les erreurs
           if [ -f api/tests/seed_data.sql ]; then
             psql -h localhost -U user_test -d user_test -f api/tests/seed_data.sql || true
           fi
@@ -96,8 +112,7 @@ jobs:
           MLFLOW_TRACKING_URI: "http://localhost:5000"
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)
-          # On lance pytest. S'il y a encore des erreurs de tables manquantes, 
-          # on verra exactement laquelle dans les logs.
+          # On lance les tests
           python -m pytest -v api/tests/test_api.py
 
   # --- JOB 4 : AIRFLOW & MONITORING ---

@@ -70,7 +70,7 @@ def test_predict_arrival_delay_with_seed_data(mock_mlflow_model):
 	"""
 	# On patche 'get_model' du router de prédiction pour utiliser notre mock
 	with patch("api.routers.predict.get_model", return_value=mock_mlflow_model):
-		response = client.post("/prediction/arrival_delay_prediction")
+		response = client.post("/prediction/arrival_delay")
 		
 		assert response.status_code == 200
 		data = response.json()
@@ -89,7 +89,7 @@ def test_predict_arrival_delay_with_seed_data(mock_mlflow_model):
 def test_predict_503_when_no_model():
 	"""Vérifie que l'API prévient si MLflow est inaccessible"""
 	with patch("api.routers.predict.get_model", return_value=None):
-		response = client.post("/prediction/arrival_delay_prediction")
+		response = client.post("/prediction/arrival_delay")
 		assert response.status_code == 503
 		assert "indisponible" in response.json()["detail"]
 
