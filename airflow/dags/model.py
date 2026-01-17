@@ -22,7 +22,7 @@ default_args = {
 @dag(
 	dag_id = "model",
 	default_args = default_args,
-	schedule = None,
+	schedule = "@daily",
 	catchup = False,
 	tags = ["airlines", "ml", "mlflow"],
 	max_active_runs = 1

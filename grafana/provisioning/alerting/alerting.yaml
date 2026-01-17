@@ -1,0 +1,106 @@
+apiVersion: 1
+
+groups:
+  # Groupe 1 - Santé Système (Fusion CPU/RAM & Quota)
+  - orgId: 1
+    name: infrastructure_alerts
+    folder: "1 - Infrastructure"
+    interval: 1m
+    rules:
+      - uid: host_resource_exhaustion
+        title: Host Resource Exhaustion (CPU/RAM)
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: Prometheus
+            model:
+              # Alerte si CPU > 90% OU RAM > 95%
+              expr: |
+                (100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90)
+                or
+                (100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 95)
+              refId: A
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        labels: { severity: critical }
+
+  # Groupe 2 - Airflow & Pipeline (Disponibilité & Échecs)
+  - orgId: 1
+    name: pipeline_health
+    folder: "2 - Airflow"
+    interval: 1m
+    rules:
+      - uid: scheduler_down
+        title: Airflow Scheduler Heartbeat Lost
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: Prometheus
+            model:
+              expr: absent(airflow_scheduler_heartbeat) == 1
+              refId: A
+        noDataState: OK
+        execErrState: OK
+        for: 3m
+        labels: { severity: critical }
+
+      - uid: critical_dag_failures
+        title: Critical DAG Failures (ETL/ML)
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: Prometheus
+            model:
+              # Unifie les échecs de tous les DAGs importants
+              expr: sum(increase(airflow_dagrun_duration_failed_count[1h])) > 0
+              refId: A
+        noDataState: OK
+        execErrState: OK
+        for: 1m
+        labels: { severity: warning }
+
+  # Groupe 3 - Qualité ML (Performance du Champion)
+  - orgId: 1
+    name: ml_performance
+    folder: "4 - Machine Learning"
+    interval: 5m # Intervalle plus long pour le ML
+    rules:
+      - uid: production_model_degradation
+        title: Production Model Degradation (R2/MAE)
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange: { from: 86400, to: 0 }
+            datasourceUid: Prometheus
+            model:
+              # Alerte si la précision chute OU si l'erreur augmente trop
+              expr: |
+                (ml_model_r2_score{status="production"} < 0.80)
+                or
+                (ml_model_mae{status="production"} > 25)
+              refId: A
+        noDataState: OK
+        execErrState: OK
+        for: 1h
+        labels: { severity: warning }
+
+      - uid: training_stalled
+        title: Model Training Stalled
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange: { from: 172800, to: 0 }
+            datasourceUid: Prometheus
+            model:
+              expr: (time() - timestamp(ml_training_rows_count)) / 3600 > 48
+              refId: A
+              intervalMs: 3600000 
+              maxDataPoints: 100
+        noDataState: OK
+        execErrState: OK
+        for: 1h
+        labels: { severity: warning }
