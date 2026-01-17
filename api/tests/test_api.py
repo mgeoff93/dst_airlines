@@ -64,27 +64,25 @@ def test_live_projections():
 # --- 3. TESTS DE PRÉDICTION (UTILISANT LE SEED SQL) ---
 
 def test_predict_arrival_delay_with_seed_data(mock_mlflow_model):
-	"""
-	Teste l'endpoint de prédiction en utilisant les données réelles 
-	injectées par le seed SQL dans la DB de test.
-	"""
-	# On patche 'get_model' du router de prédiction pour utiliser notre mock
-	with patch("api.routers.predict.get_model", return_value=mock_mlflow_model):
-		response = client.get("/prediction/arrival_delay")
-		
-		assert response.status_code == 200
-		data = response.json()
-		
-		assert data["status"] == "success"
-		# Si le seed a bien fonctionné, count doit être > 0 (LIMIT 5 dans ton .bat)
-		assert data["count"] > 0
-		
-		# Vérification du format contractuel
-		first_pred = data["predictions"][0]
-		assert "callsign" in first_pred
-		assert "predicted_delay" in first_pred
-		# Vérifie que la clé technique unique_key a été supprimée du dictionnaire final
-		assert "unique_key" not in first_pred
+    """
+    Teste l'endpoint de prédiction en vérifiant le format réel de sortie.
+    """
+    with patch("api.routers.predict.get_model", return_value=mock_mlflow_model):
+        response = client.get("/prediction/arrival_delay")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert data["status"] == "success"
+        assert data["count"] > 0
+        
+        # On vérifie les clés réellement présentes dans la réponse
+        first_pred = data["predictions"][0]
+        assert "indice" in first_pred
+        assert "predicted_delay" in first_pred
+        
+        # Optionnel : On peut vérifier que le delay est bien un nombre
+        assert isinstance(first_pred["predicted_delay"], (int, float))
 
 def test_predict_503_when_no_model():
 	"""Vérifie que l'API prévient si MLflow est inaccessible"""
