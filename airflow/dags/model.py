@@ -14,7 +14,7 @@ logging.basicConfig(
 
 default_args = {
 	"owner": "DST Airlines",
-	"start_date": datetime(2026, 1, 16),
+	"start_date": datetime(2026, 1, 18),
 	"retries": 1,
 	"retry_delay": timedelta(seconds = 60),
 }
@@ -22,7 +22,7 @@ default_args = {
 @dag(
 	dag_id = "model",
 	default_args = default_args,
-	schedule = "@daily",
+	schedule = "0 */6 * * *",
 	catchup = False,
 	tags = ["airlines", "ml", "mlflow"],
 	max_active_runs = 1

@@ -111,7 +111,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "decimals": 1,
+          "decimals": 3,
           "mappings": [],
           "min": 0,
           "noValue": "No model",
@@ -194,7 +194,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "decimals": 1,
+          "decimals": 3,
           "mappings": [],
           "min": 0,
           "noValue": "No model",
@@ -277,7 +277,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "decimals": 1,
+          "decimals": 3,
           "mappings": [],
           "min": 0,
           "noValue": "No model",
@@ -405,6 +405,14 @@
                   "fixedColor": "purple",
                   "mode": "fixed"
                 }
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 3
               }
             ]
           },
@@ -420,6 +428,10 @@
                   "fixedColor": "blue",
                   "mode": "fixed"
                 }
+              },
+              {
+                "id": "decimals",
+                "value": 3
               }
             ]
           },
@@ -435,6 +447,10 @@
                   "fixedColor": "green",
                   "mode": "fixed"
                 }
+              },
+              {
+                "id": "decimals",
+                "value": 3
               }
             ]
           },
@@ -450,6 +466,10 @@
                   "fixedColor": "orange",
                   "mode": "fixed"
                 }
+              },
+              {
+                "id": "decimals",
+                "value": 3
               }
             ]
           }
