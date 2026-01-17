@@ -1,4 +1,4 @@
-name: CI DST Airlines - Infrastructure
+name: CI DST Airlines - Full Stack Validation
 
 on:
   push:
@@ -7,8 +7,45 @@ on:
     branches: [ main, master, refactoring ]
 
 jobs:
-  # JOB 1 : Tests API (Python + Postgres)
-  api:
+  # --- JOB 1 : LINTING & SECURITY ---
+  lint-and-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Dockerfiles (Hadolint)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          recursive: true
+          ignore: DL3008 # Ignore warning sur les versions d'apt-get pour la CI
+
+      - name: Python Safety Check
+        run: |
+          pip install safety
+          # On vérifie les deux fichiers requirements
+          safety check -r api/requirements.txt || echo "Warnings found in API"
+          safety check -r airflow/requirements.txt || echo "Warnings found in Airflow"
+
+  # --- JOB 2 : TERRAFORM VALIDATION ---
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+
+      - name: Terraform Init & Validate
+        run: |
+          cd terraform
+          terraform init -backend=false
+          terraform validate
+          terraform fmt -check
+
+  # --- JOB 3 : API & DATA SCHEMA TESTS ---
+  api-tests:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -26,84 +63,34 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest httpx pandas numpy
+          pip install pytest httpx pandas numpy sqlalchemy psycopg2-binary mlflow scikit-learn
           if [ -f api/requirements.txt ]; then pip install -r api/requirements.txt; fi
 
-      - name: Setup Test DB Tables & Data
+      - name: Database Schema Setup
         env:
           PGPASSWORD: password_test
         run: |
-          # Création de la base de données attendue par l'application
+          # Création de la DB applicative et injection du schéma
           psql -h localhost -U user_test -d postgres -c "CREATE DATABASE user_test;"
-          
-          # Configuration des tables et injection des données de test (Seed)
-          for DB in db_test user_test; do
-            echo "Configuring database: $DB"
-            psql -h localhost -U user_test -d $DB -c "
-            CREATE TABLE IF NOT EXISTS flight_static (
-                callsign VARCHAR(10) PRIMARY KEY,
-                airline_name VARCHAR(100),
-                origin_code VARCHAR(3),
-                destination_code VARCHAR(3),
-                commercial_flight BOOLEAN
-            );
-
-            CREATE TABLE IF NOT EXISTS flight_dynamic (
-                callsign VARCHAR(10) NOT NULL,
-                icao24 VARCHAR(10) NOT NULL,
-                flight_date DATE NOT NULL,
-                departure_scheduled TIME NOT NULL,
-                departure_actual TIME,
-                arrival_scheduled TIME,
-                arrival_actual TIME,
-                status VARCHAR(15) NOT NULL,
-                last_update TIMESTAMPTZ DEFAULT NOW(),
-                unique_key TEXT NOT NULL,
-                CONSTRAINT pk_flight_dynamic_$DB PRIMARY KEY (unique_key)
-            );
-
-            CREATE TABLE IF NOT EXISTS live_data (
-                indice SERIAL,
-                request_id UUID NOT NULL,
-                callsign VARCHAR(10) NOT NULL,
-                icao24 VARCHAR(10) NOT NULL,
-                flight_date DATE NOT NULL,
-                departure_scheduled TIME NOT NULL,
-                longitude DOUBLE PRECISION,
-                latitude DOUBLE PRECISION,
-                baro_altitude DOUBLE PRECISION,
-                geo_altitude DOUBLE PRECISION,
-                on_ground BOOLEAN,
-                velocity DOUBLE PRECISION,
-                vertical_rate DOUBLE PRECISION,
-                temperature DOUBLE PRECISION,
-                wind_speed DOUBLE PRECISION,
-                gust_speed DOUBLE PRECISION,
-                visibility DOUBLE PRECISION,
-                cloud_coverage DOUBLE PRECISION,
-                rain DOUBLE PRECISION,
-                global_condition VARCHAR(100),
-                unique_key TEXT NOT NULL,
-                CONSTRAINT pk_live_data_$DB PRIMARY KEY (request_id, unique_key),
-                CONSTRAINT fk_live_dynamic_$DB FOREIGN KEY(unique_key)
-                    REFERENCES flight_dynamic(unique_key)
-            );
-            "
-            # Injection du seed SQL (indispensable pour les tests de prédiction)
-            if [ -f api/tests/seed_data.sql ]; then
-              psql -h localhost -U user_test -d $DB -f api/tests/seed_data.sql
-            fi
-          done
+          # Utilisation de ton fichier init_airlines.sql pour valider le schéma réel
+          if [ -f airflow/config/init_airlines.sql ]; then
+            psql -h localhost -U user_test -d user_test -f airflow/config/init_airlines.sql
+          fi
+          # Injection des données de test pour les prédictions
+          if [ -f api/tests/seed_data.sql ]; then
+             psql -h localhost -U user_test -d user_test -f api/tests/seed_data.sql
+          fi
 
       - name: Run API Unit Tests
         env:
@@ -111,61 +98,56 @@ jobs:
           POSTGRES_PORT: 5432
           POSTGRES_USER: user_test
           POSTGRES_PASSWORD: password_test
-          POSTGRES_DB: db_test
+          POSTGRES_DB: user_test
+          MLFLOW_TRACKING_URI: "http://localhost:5000"
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)
           python -m pytest -v api/tests/test_api.py
 
-  # JOB 2 : Validation Terraform
-  terraform:
+  # --- JOB 4 : AIRFLOW & MONITORING CONFIG VALIDATION ---
+  airflow-and-monitoring:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.5.0
-      - name: Terraform Init & Validate
-        run: |
-          cd terraform
-          terraform init
-          terraform validate
-          terraform fmt -check
+      - uses: actions/checkout@v4
 
-  # JOB 3 : Validation Airflow (Correction Selenium incluse)
-  airflow:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install Airflow & Dependencies
+
+      - name: Install Airflow & Tools
         run: |
-          python -m pip install --upgrade pip
-          pip install "apache-airflow>=2.10.0" \
-                      psycopg2-binary \
-                      prometheus-client \
-                      pandas \
-                      pyarrow \
-                      mlflow \
-                      scikit-learn \
-                      requests \
-                      selenium
+          pip install "apache-airflow>=2.10.0" prometheus-client
+          
       - name: Static DAG Load Test
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)/airflow/plugins
           python -c "from airflow.models import DagBag; dagbag = DagBag(dag_folder='airflow/dags', include_examples=False); print('Import Errors:', dagbag.import_errors); exit(1 if len(dagbag.import_errors) > 0 else 0)"
 
-  # JOB 4 : Validation Docker Compose
-  docker:
+      - name: Validate Grafana Dashboards (JSON Syntax)
+        run: |
+          for file in grafana/dashboards/*.json; do
+            jq . "$file" > /dev/null || exit 1
+          done
+          echo "All dashboards are valid JSON"
+
+  # --- JOB 5 : DOCKER COMPOSE CONFIG ---
+  docker-compose:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Validate Docker Compose Config
         env:
+          # On mock les variables attendues par le compose
           AIRFLOW_JWT_SECRET: "ci_static_secret_32_characters_long"
           AIRFLOW_FERNET_KEY: "ci_static_fernet_key_validation="
           AIRFLOW_API_SECRET_KEY: "ci_static_api_secret_key_32_char"
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_PORT: 5432
+          AIRFLOW_POSTGRES_DB: airflow
+          AIRLINES_POSTGRES_DB: airlines
+          MLFLOW_API_URL: http://mlflow:5000
+          MODEL_NAME: champion
+          SELENIUM_POOL_SIZE: 2
         run: docker compose config
