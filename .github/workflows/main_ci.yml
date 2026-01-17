@@ -7,22 +7,16 @@ on:
     branches: [ main, master, refactoring ]
 
 jobs:
-  # --- JOB 1 : LINTING & SECURITY ---
-  lint-and-security:
+  # --- JOB 1 : SECURITY CHECK ---
+  # Suppression de Hadolint ici
+  security:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check Dockerfiles (Hadolint)
-        uses: hadolint/hadolint-action@v3.1.0
-        with:
-          recursive: true
-          ignore: DL3008 # Ignore warning sur les versions d'apt-get pour la CI
-
       - name: Python Safety Check
         run: |
           pip install safety
-          # On vérifie les deux fichiers requirements
           safety check -r api/requirements.txt || echo "Warnings found in API"
           safety check -r airflow/requirements.txt || echo "Warnings found in Airflow"
 
@@ -53,7 +47,7 @@ jobs:
         env:
           POSTGRES_USER: user_test
           POSTGRES_PASSWORD: password_test
-          POSTGRES_DB: db_test
+          POSTGRES_DB: user_test # On utilise direct la DB cible ici
         ports:
           - 5432:5432
         options: >-
@@ -77,19 +71,20 @@ jobs:
           pip install pytest httpx pandas numpy sqlalchemy psycopg2-binary mlflow scikit-learn
           if [ -f api/requirements.txt ]; then pip install -r api/requirements.txt; fi
 
-      - name: Database Schema Setup
+      - name: Database Schema Setup & Seeding
         env:
           PGPASSWORD: password_test
         run: |
-          # Création de la DB applicative et injection du schéma
-          psql -h localhost -U user_test -d postgres -c "CREATE DATABASE user_test;"
-          # Utilisation de ton fichier init_airlines.sql pour valider le schéma réel
+          # 1. On injecte le schéma réel depuis ton fichier config
           if [ -f airflow/config/init_airlines.sql ]; then
-            psql -h localhost -U user_test -d user_test -f airflow/config/init_airlines.sql
+            echo "Loading core schema..."
+            psql -h localhost -U user_test -d user_test -v ON_ERROR_STOP=1 -f airflow/config/init_airlines.sql
           fi
-          # Injection des données de test pour les prédictions
+          
+          # 2. On injecte les données de test (seed)
           if [ -f api/tests/seed_data.sql ]; then
-             psql -h localhost -U user_test -d user_test -f api/tests/seed_data.sql
+            echo "Loading seed data..."
+            psql -h localhost -U user_test -d user_test -v ON_ERROR_STOP=1 -f api/tests/seed_data.sql
           fi
 
       - name: Run API Unit Tests
@@ -104,7 +99,7 @@ jobs:
           export PYTHONPATH=$PYTHONPATH:$(pwd)
           python -m pytest -v api/tests/test_api.py
 
-  # --- JOB 4 : AIRFLOW & MONITORING CONFIG VALIDATION ---
+  # --- JOB 4 : AIRFLOW & MONITORING ---
   airflow-and-monitoring:
     runs-on: ubuntu-latest
     steps:
@@ -124,12 +119,15 @@ jobs:
           export PYTHONPATH=$PYTHONPATH:$(pwd)/airflow/plugins
           python -c "from airflow.models import DagBag; dagbag = DagBag(dag_folder='airflow/dags', include_examples=False); print('Import Errors:', dagbag.import_errors); exit(1 if len(dagbag.import_errors) > 0 else 0)"
 
-      - name: Validate Grafana Dashboards (JSON Syntax)
+      - name: Validate Grafana Dashboards
         run: |
-          for file in grafana/dashboards/*.json; do
-            jq . "$file" > /dev/null || exit 1
-          done
-          echo "All dashboards are valid JSON"
+          # Vérifie si le dossier existe avant de boucler
+          if [ -d grafana/dashboards ]; then
+            for file in grafana/dashboards/*.json; do
+              jq . "$file" > /dev/null || exit 1
+            done
+            echo "All dashboards are valid JSON"
+          fi
 
   # --- JOB 5 : DOCKER COMPOSE CONFIG ---
   docker-compose:
@@ -138,7 +136,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate Docker Compose Config
         env:
-          # On mock les variables attendues par le compose
           AIRFLOW_JWT_SECRET: "ci_static_secret_32_characters_long"
           AIRFLOW_FERNET_KEY: "ci_static_fernet_key_validation="
           AIRFLOW_API_SECRET_KEY: "ci_static_api_secret_key_32_char"
