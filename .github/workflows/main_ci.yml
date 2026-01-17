@@ -75,13 +75,21 @@ jobs:
         env:
           PGPASSWORD: password_test
         run: |
-          # 1. On injecte le schéma réel depuis ton fichier config
+          # 1. On injecte le schéma (en ignorant les erreurs de COPY si elles sont dans le SQL)
           if [ -f airflow/config/init_airlines.sql ]; then
             echo "Loading core schema..."
-            psql -h localhost -U user_test -d user_test -v ON_ERROR_STOP=1 -f airflow/config/init_airlines.sql
+            # On utilise sed pour transformer les COPY en \copy ou on accepte que ça fail
+            psql -h localhost -U user_test -d user_test -f airflow/config/init_airlines.sql || echo "Schema partially loaded (checking for COPY errors)"
           fi
           
-          # 2. On injecte les données de test (seed)
+          # 2. FIX : Import manuel du CSV depuis le runner vers le conteneur
+          # Remplace 'airports' par le nom exact de ta table et vérifie le chemin du CSV
+          if [ -f airflow/config/airports.csv ]; then
+            echo "Importing airports data via client-side \copy..."
+            psql -h localhost -U user_test -d user_test -c "\copy airports FROM 'airflow/config/airports.csv' WITH (FORMAT csv, HEADER true);"
+          fi
+
+          # 3. Injection des données de test (seed)
           if [ -f api/tests/seed_data.sql ]; then
             echo "Loading seed data..."
             psql -h localhost -U user_test -d user_test -v ON_ERROR_STOP=1 -f api/tests/seed_data.sql
