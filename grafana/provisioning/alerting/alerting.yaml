@@ -1,106 +1,258 @@
 apiVersion: 1
-
 groups:
-  # Groupe 1 - Santé Système (Fusion CPU/RAM & Quota)
-  - orgId: 1
-    name: infrastructure_alerts
-    folder: "1 - Infrastructure"
-    interval: 1m
-    rules:
-      - uid: host_resource_exhaustion
-        title: Host Resource Exhaustion (CPU/RAM)
-        condition: A
-        data:
-          - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
-            datasourceUid: Prometheus
-            model:
-              # Alerte si CPU > 90% OU RAM > 95%
-              expr: |
-                (100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90)
-                or
-                (100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 95)
-              refId: A
-        noDataState: OK
-        execErrState: OK
-        for: 5m
-        labels: { severity: critical }
-
-  # Groupe 2 - Airflow & Pipeline (Disponibilité & Échecs)
-  - orgId: 1
-    name: pipeline_health
-    folder: "2 - Airflow"
-    interval: 1m
-    rules:
-      - uid: scheduler_down
-        title: Airflow Scheduler Heartbeat Lost
-        condition: A
-        data:
-          - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
-            datasourceUid: Prometheus
-            model:
-              expr: absent(airflow_scheduler_heartbeat) == 1
-              refId: A
-        noDataState: OK
-        execErrState: OK
-        for: 3m
-        labels: { severity: critical }
-
-      - uid: critical_dag_failures
-        title: Critical DAG Failures (ETL/ML)
-        condition: A
-        data:
-          - refId: A
-            relativeTimeRange: { from: 3600, to: 0 }
-            datasourceUid: Prometheus
-            model:
-              # Unifie les échecs de tous les DAGs importants
-              expr: sum(increase(airflow_dagrun_duration_failed_count[1h])) > 0
-              refId: A
-        noDataState: OK
-        execErrState: OK
-        for: 1m
-        labels: { severity: warning }
-
-  # Groupe 3 - Qualité ML (Performance du Champion)
-  - orgId: 1
-    name: ml_performance
-    folder: "4 - Machine Learning"
-    interval: 5m # Intervalle plus long pour le ML
-    rules:
-      - uid: production_model_degradation
-        title: Production Model Degradation (R2/MAE)
-        condition: A
-        data:
-          - refId: A
-            relativeTimeRange: { from: 86400, to: 0 }
-            datasourceUid: Prometheus
-            model:
-              # Alerte si la précision chute OU si l'erreur augmente trop
-              expr: |
-                (ml_model_r2_score{status="production"} < 0.80)
-                or
-                (ml_model_mae{status="production"} > 25)
-              refId: A
-        noDataState: OK
-        execErrState: OK
-        for: 1h
-        labels: { severity: warning }
-
-      - uid: training_stalled
-        title: Model Training Stalled
-        condition: A
-        data:
-          - refId: A
-            relativeTimeRange: { from: 172800, to: 0 }
-            datasourceUid: Prometheus
-            model:
-              expr: (time() - timestamp(ml_training_rows_count)) / 3600 > 48
-              refId: A
-              intervalMs: 3600000 
-              maxDataPoints: 100
-        noDataState: OK
-        execErrState: OK
-        for: 1h
-        labels: { severity: warning }
+    - orgId: 1
+      name: KPIs
+      folder: KPIs
+      interval: 10s
+      rules:
+        - uid: cfamr0mrf5tkwc
+          title: R2
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: Prometheus
+              model:
+                editorMode: code
+                expr: ml_model_r2_score{status="production"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: lt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          keepFiringFor: 50s
+          labels:
+            kpi: r2
+          isPaused: false
+          notification_settings:
+            receiver: grafana-default-email
+        - uid: efamr72gwl2ioc
+          title: MAE
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 300
+                to: 0
+              datasourceUid: Prometheus
+              model:
+                editorMode: code
+                expr: ml_model_mae{status="production"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 25
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          keepFiringFor: 50s
+          labels:
+            kpi: mae
+          isPaused: false
+          notification_settings:
+            receiver: grafana-default-email
+        - uid: dfamrls80ctfkc
+          title: Uptime
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: Prometheus
+              model:
+                editorMode: code
+                expr: airflow_scheduler_heartbeat
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 1
+                        type: lt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          keepFiringFor: 50s
+          labels:
+            kpi: uptime
+          isPaused: false
+          notification_settings:
+            receiver: grafana-default-email
+        - uid: ffamsl4m9uwaoa
+          title: Latency - 1
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: Prometheus
+              model:
+                editorMode: code
+                expr: airflow_pool_starving_tasks_selenium_pool
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 20
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          keepFiringFor: 50s
+          isPaused: false
+          notification_settings:
+            receiver: grafana-default-email
+        - uid: efamsof88sb9cb
+          title: Latency - 2
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: Prometheus
+              model:
+                editorMode: code
+                expr: sum(rate(etl_loaded_rows_run[10m]))
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: eq
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          keepFiringFor: 50s
+          isPaused: false
+          notification_settings:
+            receiver: grafana-default-email
