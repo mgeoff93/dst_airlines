@@ -26,7 +26,6 @@ class OpenskyClient:
 			registry=self.registry
 		)
 
-		# Pre-initialisation des labels pour eviter les "NaN" dans Grafana
 		for code in ['401', '429', '500', 'network_error', 'auth_error']:
 			self.metric_api_errors.labels(status_code=code).inc(0)
 
@@ -98,7 +97,7 @@ class OpenskyClient:
 				response.raise_for_status()
 				data = response.json()
 				
-				# Succes : on pousse les metriques a 0 erreur
+				# Succes : on pousse les metriques
 				self._push_metrics()
 				return data if 'states' in data else {"states": []}
 

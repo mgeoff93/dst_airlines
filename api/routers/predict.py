@@ -6,7 +6,7 @@ import numpy as np
 import logging
 import time
 
-# Import des métriques définies dans ton plan
+# Import des métriques
 from api.metrics import PREDICTION_COUNT, PREDICTION_OUTPUTS, MODEL_LOAD_STATUS
 
 from api.routers.live import get_live_current_all
@@ -19,7 +19,7 @@ MODEL_URI = f"models:/{os.getenv('MODEL_NAME', 'ArrivalDelayModel')}@production"
 # Gestion du Cache avec TTL
 cached_model = None
 last_update_ts = 0
-CACHE_TTL = 300  # 5 minutes : l'API vérifiera MLflow toutes les 5 min pour une nouvelle version
+CACHE_TTL = 300  # l'API vérifie MLflow toutes les 5 min
 current_model_version = "unknown"
 
 def get_model():
@@ -33,10 +33,8 @@ def get_model():
 			cached_model = new_model
 			last_update_ts = now
 			
-			# --- EXTRACTION DE LA VERSION ---
-			# On récupère la version depuis les métadonnées de l'artefact
-			current_model_version = new_model.metadata.model_uuid[:8] # Un ID court ou...
-			# Si tu veux la version exacte du registre :
+			# Extraction de la version
+			current_model_version = new_model.metadata.model_uuid[:8]
 			client = mlflow.tracking.MlflowClient()
 			model_name = os.getenv('MODEL_NAME', 'ArrivalDelayModel')
 			latest_version = client.get_model_version_by_alias(model_name, "production").version
@@ -46,10 +44,8 @@ def get_model():
 			logging.info(f"Modèle Production {current_model_version} rafraîchi.")
 		except Exception as e:
 			logging.error(f"Erreur lors du rafraîchissement MLflow : {e}")
-			# Si le chargement échoue mais qu'on a un vieux modèle, on le garde pour le service
 			if cached_model is None:
 				MODEL_LOAD_STATUS.labels(model_alias="production").set(0)
-				# Fallback sur latest si jamais production est introuvable au démarrage
 				try:
 					latest_uri = MODEL_URI.replace("@production", "/latest")
 					cached_model = mlflow.pyfunc.load_model(latest_uri)
@@ -64,18 +60,18 @@ async def predict_all_delays():
 		raise HTTPException(status_code=503, detail="Modèle indisponible.")
 
 	try:
-		# 1. Récupération des données (fonctionnel comme avant)
+		# Récupération des données
 		live_data = get_live_current_all(None, None).get("data", [])
 		dyn_data = get_dynamic_flights(FlightStatus.live, None, None).get("data", [])
 
 		if not live_data:
 			return {"count": 0, "predictions": []}
 
-		# 2. Préparation DataFrames
+		# Préparation
 		df_live = pd.DataFrame(live_data)
 		df_dyn = pd.DataFrame(dyn_data)
 
-		# 3. Merge et Features (on garde ta logique unique_key)
+		# Merge et features
 		if not df_dyn.empty:
 			df = df_live.merge(df_dyn[["unique_key", "departure_difference"]], on="unique_key", how="left")
 		else:
@@ -93,7 +89,7 @@ async def predict_all_delays():
 
 		df["predicted_delay"] = preds.round(2)
 
-		# 5. Réponse
+		# Réponse
 		return {
 			"status": "success",
 			"count": len(df),

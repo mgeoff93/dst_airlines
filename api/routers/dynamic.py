@@ -7,7 +7,7 @@ from api.services import flight_features
 
 router = APIRouter(tags = ["Dynamic"])
 
-# 1. Définition des choix (les valeurs doivent matcher tes conditions if/elif)
+# Définition de la classe enum
 class FlightStatus(str, Enum):
 	live = "live"
 	history = "historical"
@@ -22,12 +22,11 @@ def get_datasets():
 def get_dynamic_flights(
 	timeline: FlightStatus = Query(FlightStatus.all),
 	callsign: Optional[str] = None,
-	limit: Optional[int] = Query(None, ge=1) # 1. Ajout de la limite optionnelle
+	limit: Optional[int] = Query(None, ge=1)
 ):
 	datasets = get_datasets()
-	total_loaded = len(datasets["current"]) + len(datasets["done"])
 	
-	# 3. Sélection du dataset
+	# Sélection du dataset
 	if timeline == FlightStatus.live:
 		rows = datasets["current"]
 	elif timeline == FlightStatus.history:
@@ -35,18 +34,18 @@ def get_dynamic_flights(
 	else:
 		rows = datasets["current"] + datasets["done"]
 
-	# --- filtre callsign ---
+	# Filtre callsign
 	if callsign:
 		rows = [r for r in rows if r.get("callsign") == callsign]
 
-	# --- tri cohérent ---
+	# tri cohérent
 	rows = sorted(
 		rows, 
 		key=lambda r: r.get("last_update") if r.get("last_update") is not None else pd.Timestamp.min, 
 		reverse=True
 	)
 
-	# --- 2. Application de la limite (Slicing Python) ---
+	# Application de la limite
 	if limit is not None:
 		rows = rows[:limit]
 

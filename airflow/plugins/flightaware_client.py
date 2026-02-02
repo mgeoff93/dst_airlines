@@ -21,33 +21,33 @@ class FlightAwareClient:
 		self.selenium = selenium_client
 		self.postgres = postgres_client
 
-		# --- Initialisation Prometheus ---
+		# Initialisation Prometheus
 		self.registry = CollectorRegistry()
 		
 		# Métriques de performance Scraping
 		self.metric_selenium_timeouts = Counter(
-			'flightaware_selenium_timeouts_total', 
-			'Nombre de timeouts lors du chargement des éléments Selenium',
-			['callsign'],
+			"flightaware_selenium_timeouts_total", 
+			"Nombre de timeouts lors du chargement des éléments Selenium",
+			["callsign"],
 			registry=self.registry
 		)
 		# Métriques métier
 		self.metric_flights_parsed = Counter(
-			'flightaware_flights_parsed_total', 
-			'Nombre total de vols traités par FlightAware',
-			['type'], # 'static' ou 'dynamic'
+			"flightaware_flights_parsed_total", 
+			"Nombre total de vols traités par FlightAware",
+			["type"], # "static" ou "dynamic"
 			registry=self.registry
 		)
 		self.metric_commercial_status = Gauge(
-			'flightaware_last_flight_commercial', 
-			'1 si le dernier vol traité était commercial, 0 sinon',
+			"flightaware_last_flight_commercial", 
+			"1 si le dernier vol traité était commercial, 0 sinon",
 			registry=self.registry
 		)
 
 	def _push_metrics(self):
 		"""Envoie les métriques au Pushgateway."""
 		try:
-			push_to_gateway(self.pushgateway_url, job='airflow_flightaware', registry=self.registry)
+			push_to_gateway(self.pushgateway_url, job="airflow_flightaware", registry=self.registry)
 		except Exception as e:
 			logging.warning(f"Prometheus push failed for FlightAware: {e}")
 
@@ -84,7 +84,7 @@ class FlightAwareClient:
 		is_commercial = any([airline_name, origin, destination])
 		
 		# Update métriques
-		self.metric_flights_parsed.labels(type='static').inc()
+		self.metric_flights_parsed.labels(type="static").inc()
 		self.metric_commercial_status.set(1 if is_commercial else 0)
 		self._push_metrics()
 
@@ -125,7 +125,7 @@ class FlightAwareClient:
 
 		new_key = f"{callsign}_{icao24}_{current_date}_{sched_dep.strftime('%H:%M')}"
 		
-		self.metric_flights_parsed.labels(type='dynamic').inc()
+		self.metric_flights_parsed.labels(type="dynamic").inc()
 		self._push_metrics()
 
 		if dynamic and dynamic.get("unique_key") == new_key:
@@ -165,7 +165,7 @@ class FlightAwareClient:
 
 	def _get_24h_time_from_string(self, text):
 		if not text: return None
-		match = re.search(r'\d{1,2}:\d{2}(?:AM|PM)?', text)
+		match = re.search(r"\d{1,2}:\d{2}(?:AM|PM)?", text)
 		if not match: return None
 		try:
 			fmt = "%I:%M%p" if ("AM" in match.group(0) or "PM" in match.group(0)) else "%H:%M"

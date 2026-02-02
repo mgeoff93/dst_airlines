@@ -19,7 +19,7 @@ class SeleniumClient:
 	def _create_driver(self):
 		options = Options()
 		
-		# 1. Arguments de performance pure
+		# Arguments
 		arguments = [
 			"--headless=new", 
 			"--disable-gpu", 
@@ -33,7 +33,7 @@ class SeleniumClient:
 		for arg in arguments:
 			options.add_argument(arg)
 
-		# 2. Préférences pour bloquer le chargement
+		# Préférences
 		prefs = {
 			"profile.managed_default_content_settings.images": 2,
 			"profile.managed_default_content_settings.stylesheets": 2,
@@ -43,7 +43,7 @@ class SeleniumClient:
 		
 		driver = webdriver.Remote(command_executor=self.remote_url, options=options)
 		
-		# 3. Timeout de chargement de page
+		# Timeout de chargement de la page
 		driver.set_page_load_timeout(10) 
 		
 		logging.info("Selenium driver created (Ultra-Lightweight Mode)")

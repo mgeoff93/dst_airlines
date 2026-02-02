@@ -8,7 +8,6 @@ on:
 
 jobs:
   # --- JOB 1 : SECURITY CHECK ---
-  # Suppression de Hadolint ici
   security:
     runs-on: ubuntu-latest
     steps:

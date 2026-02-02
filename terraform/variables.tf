@@ -1,4 +1,4 @@
-# --- Base de Données PostgreSQL ---
+# Base de Données PostgreSQL
 variable "POSTGRES_HOST" {
   type    = string
   default = "postgres"
@@ -30,7 +30,7 @@ variable "POSTGRES_PASSWORD" {
   description = "Sensible - Défini dans tfvars"
 }
 
-# --- OpenSky Network API ---
+# OpenSky Network API
 variable "OPENSKY_USERNAME" {
   type = string
 }
@@ -55,7 +55,7 @@ variable "OPENSKY_API_URL" {
   default = "https://opensky-network.org/api/states/all"
 }
 
-# --- Weather API ---
+# Weather API
 variable "WEATHER_API_URL" {
   type    = string
   default = "https://api.weatherapi.com/v1/current.json"
@@ -76,7 +76,7 @@ variable "WEATHER_FIELDS" {
   default = ["temperature", "wind_speed", "gust_speed", "visibility", "cloud_coverage", "rain", "global_condition"]
 }
 
-# --- Selenium & Scrapers ---
+# Selenium & Scrapers
 variable "FLIGHTAWARE_BASE_URL" {
   type    = string
   default = "https://fr.flightaware.com/live/flight"
@@ -97,7 +97,7 @@ variable "SELENIUM_POOL_SIZE" {
   default = 4
 }
 
-# --- Airflow & Services ---
+# Airflow & Services
 variable "AIRFLOW_FERNET_KEY" {
   type      = string
   sensitive = true
@@ -145,7 +145,7 @@ variable "AIRFLOW_UID" {
   default = 50000
 }
 
-# --- Monitoring ---
+# Monitoring
 variable "PUSHGATEWAY_URL" {
   type    = string
   default = "http://pushgateway:9091"

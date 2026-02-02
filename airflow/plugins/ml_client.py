@@ -31,7 +31,8 @@ class MLClient:
 		mlflow.set_experiment(f"Experiment_{self.model_name}")
 
 		self.registry = CollectorRegistry()
-		# Métriques demandées
+
+		# Métriques
 		self.metric_r2_score = Gauge('ml_model_r2_score', 'Score R2', ['status'], registry=self.registry)
 		self.metric_mae = Gauge('ml_model_mae', 'Mean Absolute Error', ['status'], registry=self.registry)
 		self.metric_mse = Gauge('ml_model_mse', 'Mean Squared Error', ['status'], registry=self.registry)
@@ -103,7 +104,7 @@ class MLClient:
 			])
 			pipeline.fit(X_train, y_train)
 
-			# --- Evaluation ---
+			# Evaluation
 			y_pred = pipeline.predict(X_test)
 			metrics = {
 				"R2_Score": r2_score(y_test, y_pred),
@@ -117,9 +118,9 @@ class MLClient:
 			latence_ms = ((time.time() - start_inf) / 100) * 1000
 			mlflow.log_metrics({**metrics, "inference_latency_ms": latence_ms})
 
-			# --- GÉNÉRATION DES GRAPHIQUES (FEATURE IMPORTANCE & RÉSIDUS) ---
+			# Génération des graphiques
 			try:
-				# 1. Feature Importance
+				# Importance des features
 				importances = pipeline.named_steps['reg'].feature_importances_
 				feat_names = numeric_cols + categorical_cols
 				indices = np.argsort(importances)
@@ -132,7 +133,7 @@ class MLClient:
 				mlflow.log_artifact("feature_importance.png")
 				plt.close()
 
-				# 2. Analyse des Résidus
+				# Analyse des résidus
 				plt.figure(figsize=(8, 6))
 				plt.scatter(y_pred, y_test - y_pred, alpha=0.3)
 				plt.axhline(y=0, color='r', linestyle='--')
@@ -147,7 +148,7 @@ class MLClient:
 			except Exception as e:
 				logging.warning(f"Erreur lors de la génération des graphiques : {e}")
 
-			# --- MONITORING CHAMPION VS CHALLENGER ---
+			# Monitoring champion vs challenger
 			client = MlflowClient()
 			try:
 				prod_ver = client.get_model_version_by_alias(self.model_name, "production")
@@ -176,11 +177,11 @@ class MLClient:
 				self.metric_max_error.labels(status=status).set(val_max)
 				self.metric_inference_speed.labels(status=status).set(val_lat)
 
-			# --- LOGIQUE DE PROMOTION ---
+			# Logique de promotion
 			promoted = metrics["R2_Score"] > c_metrics["R2"] and latence_ms < 200
 			
 			if promoted:
-				logging.info("PROMOTION VALIDEE")
+				logging.info("Promotion validée !")
 				result = mlflow.sklearn.log_model(pipeline, "model", registered_model_name=self.model_name)
 				
 				# Correction robuste de la version
@@ -195,7 +196,7 @@ class MLClient:
 				self.metric_r2_score.labels(status='production').set(metrics["R2_Score"])
 				self.metric_mae.labels(status='production').set(metrics["MAE"])
 			else:
-				logging.info("PROMOTION REFUSEE")
+				logging.info("Promotion refusée !")
 			
 			self._push_metrics()
 			return {**metrics, "promoted": promoted}

@@ -2,7 +2,6 @@ from fastapi import APIRouter, HTTPException
 from api.core.database import db
 from api.services import flight_features
 import pandas as pd
-import time
 
 router = APIRouter(tags=["Merged"])
 
@@ -35,17 +34,17 @@ def get_live_rows(callsign: str, unique_key: str):
 @router.get("/merged/{callsign}")
 def get_merged_flight(callsign: str):
 
-	# --- STATIC ---
+	# Static
 	static_data = get_static_flight(callsign)
 	if not static_data:
 		raise HTTPException(status_code = 404, detail = "Callsign not found")
 
-	# --- DATASETS ---
+	# Datasets
 	datasets = get_datasets()
 	done = datasets.get("done", [])
 	current = datasets.get("current", [])
 
-	# --- HISTORY ---
+	# History
 	history = []
 	for flight in done:
 		if flight["callsign"] != callsign:
@@ -66,7 +65,7 @@ def get_merged_flight(callsign: str):
 			"live_data": live_rows
 		})
 
-	# --- LIVE ---
+	# Live
 	live = []
 	for flight in current:
 		if flight["callsign"] != callsign:
@@ -76,7 +75,7 @@ def get_merged_flight(callsign: str):
 
 		live.append({
 			"unique_key": flight.get("unique_key"),
-			"status": flight.get("status"),  # en route / departing
+			"status": flight.get("status"),
 			"departure_scheduled_ts": flight.get("departure_scheduled_ts"),
 			"departure_actual_ts": flight.get("departure_actual_ts"),
 			"arrival_scheduled_ts": flight.get("arrival_scheduled_ts"),
@@ -87,7 +86,7 @@ def get_merged_flight(callsign: str):
 			"live_data": live_rows
 		})
 
-	# --- RESPONSE ---
+	# Response
 	return {
 		"callsign": callsign,
 		"airline_name": static_data.get("airline_name"),

@@ -35,7 +35,7 @@ def get_airports(
 	return {"count": len(airports), "airports": airports.to_dict(orient = "records")}
 
 @router.get("/countries")
-def get_countries( # Correction du nom de la fonction
+def get_countries(
 	country_code: Optional[str] = None,
 	country_name: Optional[str] = None,
 	limit: Optional[int] = Query(None, ge = 1)

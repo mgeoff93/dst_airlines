@@ -3,28 +3,28 @@ apiVersion: 1
 providers:
   - name: '1 - Infrastructure'
     orgId: 1
-    folder: '1 - Infrastructure' # Nom du dossier dans l'interface Grafana
+    folder: 'Airlines'
     type: file
     options:
       path: /etc/grafana/dashboards/1_infrastructure.json
 
   - name: '2 - Airflow'
     orgId: 1
-    folder: '2 - Airflow'
+    folder: 'Airlines'
     type: file
     options:
       path: /etc/grafana/dashboards/2_airflow.json
 
   - name: '3 - ETL Pipeline'
     orgId: 1
-    folder: '3 - ETL Pipeline'
+    folder: 'Airlines'
     type: file
     options:
       path: /etc/grafana/dashboards/3_etl.json
 
   - name: '4 - Machine Learning'
     orgId: 1
-    folder: '4 - Machine Learning'
+    folder: 'Airlines'
     type: file
     options:
       path: /etc/grafana/dashboards/4_ml.json

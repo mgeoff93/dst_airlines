@@ -1,7 +1,7 @@
 @echo off
 SETLOCAL EnableDelayedExpansion
 
-:: --- Configuration ---
+:: Configuration
 SET OUTPUT_FILE=api\tests\seed_data.sql
 SET LIMIT=5
 SET CONTAINER_NAME=postgres
@@ -9,7 +9,7 @@ SET DB_USER=airflow
 SET DB_NAME=airlines
 
 echo [1/4] Preparation du fichier seed...
-echo --- Seed Data coherent --- > %OUTPUT_FILE%
+echo Seed Data coherent > %OUTPUT_FILE%
 echo SET client_encoding = 'UTF8'; >> %OUTPUT_FILE%
 
 echo [2/4] Creation du pivot de filtrage dans Docker...

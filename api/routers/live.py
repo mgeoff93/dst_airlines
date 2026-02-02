@@ -42,7 +42,7 @@ def get_live_history_all(
 	live_rows = db.query(sql, tuple(params))
 	return {"count": len(live_rows), "data": live_rows}
 
-# --- Toutes les métadonnées (Current) ---
+# Toutes les métadonnées (Current)
 
 @router.get("/live/current/all")
 def get_live_current_all(
@@ -71,7 +71,7 @@ def get_live_current_all(
 	live_rows = db.query(sql, tuple(params))
 	return {"count": len(live_rows), "data": live_rows}
 
-# --- Position / current ---
+# Position / current
 
 @router.get("/live/current/position")
 def get_live_current_position(
@@ -105,7 +105,7 @@ def get_live_current_position(
 	live_rows = db.query(sql, tuple(params))
 	return {"count": len(live_rows), "data": live_rows}
 
-# --- Weather / current ---
+# Weather / current
 
 @router.get("/live/current/weather")
 def get_live_current_weather(
@@ -140,7 +140,7 @@ def get_live_current_weather(
 	live_rows = db.query(sql, tuple(params))
 	return {"count": len(live_rows), "data": live_rows}
 
-# --- Light / current ---
+# Light / current
 
 @router.get("/live/current/light")
 def get_live_current_light(

@@ -39,5 +39,4 @@ class PostgresClient:
 				cur.execute(sql, params or ())
 				return cur.fetchall()
 
-# --- instance globale à utiliser dans tous les routers ---
 db = PostgresClient()

@@ -20,14 +20,13 @@ def get_static_flights(
 	airline_name: Optional[str] = None,
 	limit: Optional[int] = Query(None, ge=1) # 1. Ajout du paramètre optionnel (minimum 1)
 ):
-	# --- récupérer les callsigns en cours ---
+	# Récupére les callsigns en cours
 	current_rows = get_current_subset()
 	current_callsigns = {row["callsign"] for row in current_rows if row.get("callsign")}
 
 	if not current_callsigns:
 		return {"count": 0, "flights": []}
 
-	# --- construction du IN (%s, %s, ...) ---
 	in_placeholders = ",".join(["%s"] * len(current_callsigns))
 	
 	sql = f"""
@@ -40,10 +39,9 @@ def get_static_flights(
 		WHERE callsign IN ({in_placeholders})
 	"""
 
-	# paramètres SQL : d'abord les callsigns
 	params = list(current_callsigns)
 
-	# --- filtres optionnels ---
+	# Filtres optionnels
 	if origin_code:
 		sql += " AND origin_code ILIKE %s"
 		params.append(origin_code)
@@ -56,15 +54,15 @@ def get_static_flights(
 		sql += " AND airline_name ILIKE %s"
 		params.append(f"%{airline_name}%")
 
-	# --- tri ---
+	# Tri
 	sql += " ORDER BY callsign"
 
-	# --- 2. Ajout de la limite si elle est fournie ---
+	# Ajout de la limite
 	if limit is not None:
 		sql += " LIMIT %s"
 		params.append(limit)
 
-	# --- exécution ---
+	# Exécution
 	rows = db.query(sql, tuple(params))
 
 	return {"count": len(rows), "flights": rows}

@@ -8,20 +8,16 @@ from api.services import flight_features
 
 client = TestClient(app)
 
-# --- FIXTURES ---
-
 @pytest.fixture
 def mock_mlflow_model():
 	"""Crée un mock pour le modèle MLflow car le serveur n'existe pas en CI"""
 	mock = MagicMock()
-	# On simule une réponse de prédiction basée sur le nombre de lignes reçues
 	def side_effect(X):
 		return np.random.uniform(0, 30, size=len(X))
 	mock.predict.side_effect = side_effect
 	return mock
 
-# --- 1. TESTS D'INFRASTRUCTURE ---
-
+# Tests d'infrastructure
 def test_healthcheck():
 	"""Vérifie que l'API est saine et la DB connectée"""
 	response = client.get("/healthcheck")
@@ -35,8 +31,7 @@ def test_prometheus_metrics():
 	assert response.status_code == 200
 	assert "http_request_duration_seconds" in response.text
 
-# --- 2. TESTS FONCTIONNELS (ROUTERS) ---
-
+# Tests fonctionnels
 def test_get_static_flights_filtering():
 	"""Teste les filtres et la limite sur les métadonnées statiques"""
 	invalid_res = client.get("/static?limit=0")
@@ -61,8 +56,7 @@ def test_live_projections():
 		assert "wind_speed" in fields
 		assert "longitude" in fields
 
-# --- 3. TESTS DE PRÉDICTION (UTILISANT LE SEED SQL) ---
-
+# Tests de prédiction
 def test_predict_arrival_delay_with_seed_data(mock_mlflow_model):
     """
     Teste l'endpoint de prédiction en vérifiant le format réel de sortie.
@@ -76,12 +70,10 @@ def test_predict_arrival_delay_with_seed_data(mock_mlflow_model):
         assert data["status"] == "success"
         assert data["count"] > 0
         
-        # On vérifie les clés réellement présentes dans la réponse
         first_pred = data["predictions"][0]
         assert "indice" in first_pred
         assert "predicted_delay" in first_pred
         
-        # Optionnel : On peut vérifier que le delay est bien un nombre
         assert isinstance(first_pred["predicted_delay"], (int, float))
 
 def test_predict_503_when_no_model():
@@ -91,8 +83,7 @@ def test_predict_503_when_no_model():
 		assert response.status_code == 503
 		assert "indisponible" in response.json()["detail"]
 
-# --- 4. TEST DE LA LOGIQUE MÉTIER (DATE WRAP / PASSAGE DE MINUIT) ---
-
+# Test de la logique métier
 def test_flight_features_date_wrap_logic():
 	"""Vérifie que build_flight_datasets gère correctement le passage de minuit"""
 	test_data = pd.DataFrame([{
@@ -114,8 +105,7 @@ def test_flight_features_date_wrap_logic():
 	assert flight["arrival_difference"] == 15.0
 	assert flight["departure_actual_ts"].day == 14
 
-# --- 5. TEST DE FILTRAGE DES DONNÉES OBSOLÈTES (STALE DATA) ---
-
+# Test de filtrage des données obsolètes
 def test_stale_data_filtering():
 	"""Vérifie que les vols obsolètes sont filtrés"""
 	old_update = pd.Timestamp.utcnow().replace(tzinfo=None) - pd.Timedelta(hours=10)

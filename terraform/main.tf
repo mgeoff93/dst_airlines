@@ -11,7 +11,7 @@ provider "docker" {
   host = "npipe:////./pipe/docker_engine"
 }
 
-# 1. GÉNÉRATION DU FICHIER VARIABLES.JSON POUR AIRFLOW
+# Génération du fichier variables.json pour Airflow
 resource "local_file" "airflow_variables" {
   filename = "${path.module}/../airflow/config/variables.json"
   content = jsonencode({
@@ -35,7 +35,7 @@ resource "local_file" "airflow_variables" {
   })
 }
 
-# 2. GÉNÉRATION DU FICHIER .ENV POUR DOCKER COMPOSE
+# Génération du fichier .env pour docker compose
 resource "local_file" "docker_env" {
   filename = "${path.module}/../.env"
   content  = <<-EOT
@@ -55,7 +55,7 @@ resource "local_file" "docker_env" {
   EOT
 }
 
-# 3. RÉSEAUX ET VOLUMES (Partagés avec Docker Compose)
+# Réseaux et volumes
 resource "docker_network" "airflow_network" {
   name            = "airflow_network_terraform"
   check_duplicate = true
