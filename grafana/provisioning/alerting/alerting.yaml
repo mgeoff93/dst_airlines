@@ -1,0 +1,373 @@
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: Infra-Metrics
+      folder: Airlines
+      interval: 2m
+      rules:
+        - uid: ffc7zgvtwvbi8a
+          title: '[ORCH] Airflow Scheduler Heartbeat Lost'
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: Prometheus
+              model:
+                editorMode: code
+                expr: airflow_scheduler_heartbeat OR on() vector(0)
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 1
+                        type: lt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          dashboardUid: airflow_monitoring
+          panelId: 2
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          keepFiringFor: 1m
+          annotations:
+            __dashboardUid__: airflow_monitoring
+            __panelId__: "2"
+            description: Le scheduler ne bat plus. Les DAGs ne seront plus lancés. Redémarrer l'instance.
+            summary: Airflow Scheduler is DOWN
+          labels:
+            dashboard: etl
+            severity: emergency
+          isPaused: false
+          notification_settings:
+            receiver: grafana-default-email
+        - uid: efc800ws7uc5cc
+          title: '[ETL] Selenium Pool Starving'
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: Prometheus
+              model:
+                editorMode: code
+                expr: airflow_pool_starving_tasks_selenium_pool
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 20
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          dashboardUid: airflow_monitoring
+          panelId: 11
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          keepFiringFor: 1m
+          annotations:
+            __dashboardUid__: airflow_monitoring
+            __panelId__: "11"
+            description: Le pool Selenium est saturé. Augmenter le nombre de workers ou la taille du pool.
+            summary: 'Selenium workers saturation: {{ $value }} tasks waiting'
+          labels:
+            dashboard: etl
+            severity: warning
+          isPaused: false
+          notification_settings:
+            receiver: grafana-default-email
+        - uid: ffc80b61vynswb
+          title: '[DATA] Database Ingestion Stalled'
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: Prometheus
+              model:
+                editorMode: code
+                expr: sum(rate(etl_loaded_rows_run[10m]))
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: eq
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          dashboardUid: etl_pipeline
+          panelId: 24
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          keepFiringFor: 1m
+          annotations:
+            __dashboardUid__: etl_pipeline
+            __panelId__: "24"
+            description: L'ingestion Postgres est à l'arrêt. Vérifier les logs du worker ETL et l'API OpenSky.
+            summary: No data loaded in the last 10 minutes
+          labels:
+            dashboard: etl
+            severity: critical
+          isPaused: false
+          notification_settings:
+            receiver: grafana-default-email
+    - orgId: 1
+      name: ML-Metrics
+      folder: Airlines
+      interval: 2m
+      rules:
+        - uid: efc7yc4f68utce
+          title: '[ML] R2 Score Production Below 80%'
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: Prometheus
+              model:
+                editorMode: code
+                expr: ml_model_r2_score{status="production"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0.8
+                        type: lt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          dashboardUid: ml_performance
+          panelId: 2
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          annotations:
+            __dashboardUid__: ml_performance
+            __panelId__: "2"
+            description: Le R2 est tombé sous la barre des 80%. Vérifier la qualité des données d'entraînement
+            summary: 'Performance drift detected: R2 is {{ $value }}'
+          labels:
+            dashboard: ml
+            model: production
+            severity: critical
+          isPaused: false
+          notification_settings:
+            receiver: grafana-default-email
+        - uid: afc7yqaxxnri8a
+          title: '[ML] MAE Production Above 15min'
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: Prometheus
+              model:
+                editorMode: code
+                expr: ml_model_mae{status="production"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 15
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          dashboardUid: ml_performance
+          panelId: 3
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          annotations:
+            __dashboardUid__: ml_performance
+            __panelId__: "3"
+            description: L'erreur moyenne est trop élevée. Analyser les résidus et les hyperparamètres.
+            summary: 'High Prediction Error: MAE is {{ $value }} min'
+          labels:
+            dashboard: ml
+            model: production
+            severity: critical
+          isPaused: false
+          notification_settings:
+            receiver: grafana-default-email
+        - uid: ffc80ncm3oirka
+          title: '[ML] R2 Score Production Below 100%'
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: Prometheus
+              model:
+                editorMode: code
+                expr: ml_model_r2_score{status="production"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 1
+                        type: lt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          dashboardUid: ml_performance
+          panelId: 2
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          annotations:
+            __dashboardUid__: ml_performance
+            __panelId__: "2"
+            description: Le R2 est tombé sous la barre des 100%. Vérifier la qualité des données d'entraînement
+            summary: 'Performance drift detected: R2 is {{ $value }}'
+          labels:
+            dashboard: ml
+            model: production
+            severity: critical
+            test: firing
+          isPaused: false
+          notification_settings:
+            receiver: grafana-default-email
