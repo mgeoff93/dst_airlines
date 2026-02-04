@@ -55,7 +55,7 @@ class MLClient:
 	def data_preprocessing(self) -> str:
 		try:
 			res_live = requests.get(f"{self.api_url}/live/history/all", timeout=30)
-			res_dynamic = requests.get(f"{self.api_url}/dynamic", params={"status": "history"}, timeout=30)
+			res_dynamic = requests.get(f"{self.api_url}/dynamic", params={"timeline": "historical"}, timeout=30)
 			
 			data_live = res_live.json().get("data", [])
 			data_dynamic = res_dynamic.json().get("data", [])
